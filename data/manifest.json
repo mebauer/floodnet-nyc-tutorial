@@ -3,14 +3,42 @@
     {
       "dataset_id": "kb2e-tjy3",
       "name": "FloodNet: Sensor Deployment Metadata",
-      "data_updated": "March 17, 2026",
-      "downloaded_at": "April 25, 2026"
+      "data_updated": "2026-03-17",
+      "metadata_updated": null,
+      "view_count": 311,
+      "download_count": 221,
+      "comment_count": 0,
+      "average_rating": 0,
+      "category": "Environment",
+      "tags": [
+        "unclassified"
+      ],
+      "update_frequency": "unknown",
+      "row_count": 380,
+      "column_count": 16,
+      "data_url": "https://data.cityofnewyork.us/resource/kb2e-tjy3.csv",
+      "downloaded_at": "2026-04-25",
+      "last_checked_at": "2026-04-25"
     },
     {
       "dataset_id": "aq7i-eu5q",
       "name": "FloodNet: Street Flooding Events Measured by FloodNet Sensors",
-      "data_updated": "February 26, 2026",
-      "downloaded_at": "April 25, 2026"
+      "data_updated": "2026-02-26",
+      "metadata_updated": null,
+      "view_count": 1070,
+      "download_count": 448,
+      "comment_count": 0,
+      "average_rating": 0,
+      "category": "Environment",
+      "tags": [
+        "unclassified"
+      ],
+      "update_frequency": "unknown",
+      "row_count": 1887,
+      "column_count": 13,
+      "data_url": "https://data.cityofnewyork.us/resource/aq7i-eu5q.csv",
+      "downloaded_at": "2026-04-25",
+      "last_checked_at": "2026-04-25"
     }
   ]
 }
