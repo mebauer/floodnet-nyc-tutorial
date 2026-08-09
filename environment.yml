@@ -1,0 +1,14 @@
+name: floodnet_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - geopandas
+  - pandas
+  - polars
+  - duckdb
+  - pyarrow
+  - matplotlib
+  - seaborn
+  - ffmpeg
+  - jupyter
