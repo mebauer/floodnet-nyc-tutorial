@@ -1,4 +1,4 @@
-# viz.py
+# floodnet.py
 # Standard library
 import ast
 from datetime import timedelta
@@ -22,161 +22,9 @@ COLORBLIND_PALETTE = [
 ]
 
 
-def plot_sensor_profiles(df, sensor_id=None, alpha=None):
-    """Overlay flood depth-vs-time curves, one line per event.
-
-    Args:
-        df: Frame with list columns `flood_profile_time_secs` and
-            `flood_profile_depth_inches`, plus `sensor_id`. Pandas accepted.
-            Any subsetting beyond `sensor_id` is the caller's job.
-        sensor_id: Plot only this sensor. None plots every event in `df`.
-        alpha: Line opacity 0-1. None scales it to row count so dense
-            overlays stay legible.
-
-    Returns:
-        (Figure, Axes), undisplayed, so the caller can title or save.
-
-    Raises:
-        ValueError: No rows to plot.
-    """
-    if not isinstance(df, pl.DataFrame):
-        df = pl.from_pandas(df)
-
-    if sensor_id is not None:
-        df = df.filter(pl.col("sensor_id") == sensor_id)
-
-    # Fail loudly: a typo'd sensor_id would otherwise render a blank grid.
-    if df.is_empty():
-        raise ValueError(
-            f"No events to plot for sensor_id={sensor_id!r}."
-            if sensor_id is not None
-            else "No events to plot; `df` is empty."
-        )
-
-    # Fade lines as they pile up so dense overlays stay legible.
-    if alpha is None:
-        n_events = df.height
-        alpha = 1.0 if n_events <= 1 else max(0.1, min(1.0, 5.0 / n_events))
-
-    fig, ax = plt.subplots(figsize=(6, 4))
-
-    # iter_rows yields each event's two lists as parallel sequences.
-    for secs, depths in df.select([
-        "flood_profile_time_secs",
-        "flood_profile_depth_inches"
-    ]).iter_rows():
-        ax.plot(
-            secs,
-            depths,
-            color=COLORBLIND_PALETTE[0],
-            alpha=alpha,
-            marker="o",  # exposes irregular sampling a bare line would hide
-            linestyle="-",
-        )
-
-    ax.set_xlabel("Seconds from start")
-    ax.set_ylabel("Flood depth (inches)")
-    ax.grid(True)
-    fig.tight_layout()
-
-    return fig, ax
-
-
-def plot_flood_event(
-    df,
-    name_col: str = "sensor_name",
-    start_col: str = "flood_start_time_et",
-    ts_sec_col: str = "flood_profile_time_secs",
-    ts_in_col: str = "flood_profile_depth_inches",
-):
-    """Plot one flood event's depth profile against wall-clock time.
-
-    Uses the first row of `df` only; filter before calling. Elapsed seconds
-    are re-anchored to the earliest reading and offset from the event's start
-    timestamp, so the x-axis reads as real dates rather than seconds.
-
-    Args:
-        df: Frame whose first row is the event. Pandas accepted.
-        name_col: Sensor label for the title.
-        start_col: Event start timestamp; anchors the x-axis.
-        ts_sec_col: List column of elapsed seconds. JSON strings decoded.
-        ts_in_col: List column of depths, parallel to `ts_sec_col`.
-
-    Returns:
-        (Figure, Axes), undisplayed.
-
-    Raises:
-        ValueError: Empty frame, missing/empty/mismatched profile arrays, or
-            a null start time.
-    """
-    if not isinstance(df, pl.DataFrame):
-        df = pl.from_pandas(df)
-    if df.is_empty():
-        raise ValueError("df is empty.")
-
-    # Decode if the profiles survived a CSV round-trip as JSON strings.
-    schema = df.schema
-    if schema[ts_sec_col] == pl.Utf8:
-        df = df.with_columns(
-            pl.col(ts_sec_col).str.json_decode(pl.List(pl.Float64))
-        )
-    if schema[ts_in_col] == pl.Utf8:
-        df = df.with_columns(
-            pl.col(ts_in_col).str.json_decode(pl.List(pl.Float64))
-        )
-
-    event = df.row(0, named=True)
-    sensor_name = event.get(name_col)
-    start_time = event.get(start_col)
-    if start_time is None:
-        raise ValueError(f"Could not parse start time from '{start_col}'.")
-
-    secs = event.get(ts_sec_col)
-    depths_in = event.get(ts_in_col)
-    if secs is None or depths_in is None:
-        raise ValueError(
-            f"Missing time-series data in '{ts_sec_col}' and/or '{ts_in_col}'."
-        )
-    if len(secs) == 0 or len(depths_in) == 0:
-        raise ValueError("Time-series arrays are empty.")
-    # Parallel arrays: a length mismatch means silently misaligned readings.
-    if len(secs) != len(depths_in):
-        raise ValueError("Time-series arrays have different lengths (secs vs depths).")
-
-    # Pair the arrays so drops and sorting keep them aligned.
-    ts = (
-        pl.DataFrame({"sec": secs, "depth_in": depths_in})
-        .drop_nulls()
-        .sort("sec")
-    )
-    if ts.is_empty():
-        raise ValueError("Time-series data is all null after cleaning.")
-
-    # Re-anchor to the earliest reading so a nonzero first sample starts at 0.
-    ts = ts.with_columns((pl.col("sec") - pl.first("sec")).alias("sec"))
-
-    # Offset from the event start to get absolute timestamps.
-    ts = ts.with_columns(
-        (pl.lit(start_time) + pl.duration(seconds=pl.col("sec"))).alias("timestamp")
-    )
-
-    timestamps = ts["timestamp"].to_list()
-    depths = ts["depth_in"].to_list()
-
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.plot(timestamps, depths, marker="o", linestyle="-")
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d/%y %H:%M"))
-    fig.autofmt_xdate(rotation=30, ha="right")
-
-    title_start = start_time.strftime("%m/%d/%y %H:%M")
-    ax.set_title(f"Sensor: {sensor_name}\nFlood Start: {title_start}")
-    ax.set_xlabel("Date/Time")
-    ax.set_ylabel("Flood Depth (inches)")
-    ax.grid(True)
-    fig.tight_layout()
-
-    return fig, ax
-
+# ---------------------------------------------------------------------------
+# Analysis
+# ---------------------------------------------------------------------------
 
 def time_to_threshold(
     df,
@@ -358,6 +206,10 @@ def time_to_threshold(
     )
 
 
+# ---------------------------------------------------------------------------
+# Plotting
+# ---------------------------------------------------------------------------
+
 def plot_threshold_crossings(
     profiles,
     time_col: str = "time_to_thresh_sec",
@@ -465,6 +317,162 @@ def plot_threshold_crossings(
         figures.append((fig, ax))
 
     return figures
+
+
+def plot_flood_event(
+    df,
+    name_col: str = "sensor_name",
+    start_col: str = "flood_start_time_et",
+    ts_sec_col: str = "flood_profile_time_secs",
+    ts_in_col: str = "flood_profile_depth_inches",
+):
+    """Plot one flood event's depth profile against wall-clock time.
+
+    Uses the first row of `df` only; filter before calling. Elapsed seconds
+    are re-anchored to the earliest reading and offset from the event's start
+    timestamp, so the x-axis reads as real dates rather than seconds.
+
+    Args:
+        df: Frame whose first row is the event. Pandas accepted.
+        name_col: Sensor label for the title.
+        start_col: Event start timestamp; anchors the x-axis.
+        ts_sec_col: List column of elapsed seconds. JSON strings decoded.
+        ts_in_col: List column of depths, parallel to `ts_sec_col`.
+
+    Returns:
+        (Figure, Axes), undisplayed.
+
+    Raises:
+        ValueError: Empty frame, missing/empty/mismatched profile arrays, or
+            a null start time.
+    """
+    if not isinstance(df, pl.DataFrame):
+        df = pl.from_pandas(df)
+    if df.is_empty():
+        raise ValueError("df is empty.")
+
+    # Decode if the profiles survived a CSV round-trip as JSON strings.
+    schema = df.schema
+    if schema[ts_sec_col] == pl.Utf8:
+        df = df.with_columns(
+            pl.col(ts_sec_col).str.json_decode(pl.List(pl.Float64))
+        )
+    if schema[ts_in_col] == pl.Utf8:
+        df = df.with_columns(
+            pl.col(ts_in_col).str.json_decode(pl.List(pl.Float64))
+        )
+
+    event = df.row(0, named=True)
+    sensor_name = event.get(name_col)
+    start_time = event.get(start_col)
+    if start_time is None:
+        raise ValueError(f"Could not parse start time from '{start_col}'.")
+
+    secs = event.get(ts_sec_col)
+    depths_in = event.get(ts_in_col)
+    if secs is None or depths_in is None:
+        raise ValueError(
+            f"Missing time-series data in '{ts_sec_col}' and/or '{ts_in_col}'."
+        )
+    if len(secs) == 0 or len(depths_in) == 0:
+        raise ValueError("Time-series arrays are empty.")
+    # Parallel arrays: a length mismatch means silently misaligned readings.
+    if len(secs) != len(depths_in):
+        raise ValueError("Time-series arrays have different lengths (secs vs depths).")
+
+    # Pair the arrays so drops and sorting keep them aligned.
+    ts = (
+        pl.DataFrame({"sec": secs, "depth_in": depths_in})
+        .drop_nulls()
+        .sort("sec")
+    )
+    if ts.is_empty():
+        raise ValueError("Time-series data is all null after cleaning.")
+
+    # Re-anchor to the earliest reading so a nonzero first sample starts at 0.
+    ts = ts.with_columns((pl.col("sec") - pl.first("sec")).alias("sec"))
+
+    # Offset from the event start to get absolute timestamps.
+    ts = ts.with_columns(
+        (pl.lit(start_time) + pl.duration(seconds=pl.col("sec"))).alias("timestamp")
+    )
+
+    timestamps = ts["timestamp"].to_list()
+    depths = ts["depth_in"].to_list()
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(timestamps, depths, marker="o", linestyle="-")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d/%y %H:%M"))
+    fig.autofmt_xdate(rotation=30, ha="right")
+
+    title_start = start_time.strftime("%m/%d/%y %H:%M")
+    ax.set_title(f"Sensor: {sensor_name}\nFlood Start: {title_start}")
+    ax.set_xlabel("Date/Time")
+    ax.set_ylabel("Flood Depth (inches)")
+    ax.grid(True)
+    fig.tight_layout()
+
+    return fig, ax
+
+
+def plot_sensor_profiles(df, sensor_id=None, alpha=None):
+    """Overlay flood depth-vs-time curves, one line per event.
+
+    Args:
+        df: Frame with list columns `flood_profile_time_secs` and
+            `flood_profile_depth_inches`, plus `sensor_id`. Pandas accepted.
+            Any subsetting beyond `sensor_id` is the caller's job.
+        sensor_id: Plot only this sensor. None plots every event in `df`.
+        alpha: Line opacity 0-1. None scales it to row count so dense
+            overlays stay legible.
+
+    Returns:
+        (Figure, Axes), undisplayed, so the caller can title or save.
+
+    Raises:
+        ValueError: No rows to plot.
+    """
+    if not isinstance(df, pl.DataFrame):
+        df = pl.from_pandas(df)
+
+    if sensor_id is not None:
+        df = df.filter(pl.col("sensor_id") == sensor_id)
+
+    # Fail loudly: a typo'd sensor_id would otherwise render a blank grid.
+    if df.is_empty():
+        raise ValueError(
+            f"No events to plot for sensor_id={sensor_id!r}."
+            if sensor_id is not None
+            else "No events to plot; `df` is empty."
+        )
+
+    # Fade lines as they pile up so dense overlays stay legible.
+    if alpha is None:
+        n_events = df.height
+        alpha = 1.0 if n_events <= 1 else max(0.1, min(1.0, 5.0 / n_events))
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+
+    # iter_rows yields each event's two lists as parallel sequences.
+    for secs, depths in df.select([
+        "flood_profile_time_secs",
+        "flood_profile_depth_inches"
+    ]).iter_rows():
+        ax.plot(
+            secs,
+            depths,
+            color=COLORBLIND_PALETTE[0],
+            alpha=alpha,
+            marker="o",  # exposes irregular sampling a bare line would hide
+            linestyle="-",
+        )
+
+    ax.set_xlabel("Seconds from start")
+    ax.set_ylabel("Flood depth (inches)")
+    ax.grid(True)
+    fig.tight_layout()
+
+    return fig, ax
 
 
 def plot_storm_events(
@@ -658,5 +666,113 @@ def plot_storm_events(
 
         fig.autofmt_xdate()
         fig.tight_layout()
+
+    return fig, ax
+
+
+def plot_ranked_sensors(
+    ranked_df,
+    metadata_gdf,
+    boro_gdf,
+    value_col,
+    title,
+    label=None,
+    join_col="sensor_id",
+    figsize=(8, 8),
+    cmap="viridis",
+):
+    """
+    Plot ranked FloodNet sensors on a NYC borough map.
+
+    Merges a ranked sensor DataFrame onto point geometries and renders
+    each sensor as a choropleth dot scaled by value_col. All sensors
+    in metadata_gdf are shown as light gray reference points; only those
+    present in ranked_df are colored.
+
+    Parameters
+    ----------
+    ranked_df : pl.DataFrame
+        Polars DataFrame of ranked sensors. Must contain join_col and value_col.
+    metadata_gdf : gpd.GeoDataFrame
+        Point geometries for all deployed sensors. Must contain join_col.
+    boro_gdf : gpd.GeoDataFrame
+        NYC borough boundary polygons used as the base map.
+    value_col : str
+        Column name in ranked_df to use for color mapping.
+    title : str
+        Map title displayed above the plot.
+    label : str, optional
+        Colorbar label. If None, no label is added to the legend.
+    join_col : str, optional
+        Column name to join ranked_df onto metadata_gdf. Default is "sensor_id".
+    figsize : tuple of float, optional
+        Figure dimensions as (width, height) in inches. Default is (8, 8).
+    cmap : str, optional
+        Matplotlib colormap name. Default is "viridis".
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The figure object.
+    ax : matplotlib.axes.Axes
+        The axes object.
+    """
+    # convert Polars to pandas
+    ranked_pd = ranked_df.to_pandas()
+
+    # merge ranked metrics onto geometry
+    plot_gdf = (
+        metadata_gdf
+        .merge(
+            ranked_pd,
+            on=join_col,
+            how="inner",
+        )
+        .sort_values(value_col)
+    )
+
+    legend_kwds = {
+        "shrink": 0.70,
+    }
+
+    # optional legend label
+    if label is not None:
+        legend_kwds["label"] = label
+
+    # create figure
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # sensor plot
+    plot_gdf.plot(
+        column=value_col,
+        ax=ax,
+        legend=True,
+        cmap=cmap,
+        zorder=2,
+        legend_kwds=legend_kwds,
+    )
+
+    # borough boundaries
+    boro_gdf.plot(
+        ax=ax,
+        facecolor="None",
+        linewidth=.5,
+        edgecolor="gray",
+        zorder=0,
+    )
+
+    metadata_gdf.plot(
+        ax=ax,
+        color="lightgray",
+        alpha=0.35,
+        zorder=1,
+    )
+
+    # labels
+    ax.set_title(title, fontsize=13)
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+
+    plt.tight_layout()
 
     return fig, ax
