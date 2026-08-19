@@ -46,7 +46,10 @@ The ultimate goal of this project is to promote these datasets for academic rese
 - [FloodNet Documentation](https://floodnet-nyc.github.io/): Technical documentation covering the sensor network, the real-time data pipeline, quality assurance, and quality control.
 - [Science and Resilience Institute at Jamaica Bay (SRIJB) — FloodNet NYC](https://srijb.org/floodnet-nyc/): Institutional context and community engagement resources, including the FloodNet Community Engagement Network Map.
 
-# 5. Say Hello!
+# 5. Related Projects
+- [mebauer/nyc-flood-data](https://github.com/mebauer/nyc-flood-data): Flood Data for NYC — a comprehensive, reproducible inventory of flood-related datasets across NYC Open Data.
+
+# 6. Say Hello!
 Feel free to reach out.
 - LinkedIn: [markebauer](https://www.linkedin.com/in/markebauer/)   
 - Portfolio: [mebauer.github.io](https://mebauer.github.io/)
