@@ -38,6 +38,14 @@ The ultimate goal of this project is to promote these datasets for academic rese
 ## Academic Research:
 - Mydlarz, C., Sai Venkat Challagonda, P., Steers, B., Rucker, J., Brain, T., Branco, B., et al. (2024). FloodNet: Low-cost ultrasonic sensors for real-time measurement of hyperlocal, street-level floods in New York City. Water Resources Research, 60, e2023WR036806. https://doi.org/10.1029/2023WR036806
 
+## FloodNet Project Resources
+- [FloodNet NYC](https://www.floodnet.nyc): The project's main website.
+- [Data Dashboard](https://dataviz.floodnet.nyc): View and interact with real-time and historic data from all FloodNet sensors.
+- [Sensors & Data / Methodology](https://www.floodnet.nyc/methodology): Background on the sensor hardware, deployment, and the QC process behind the datasets.
+- [Flood Event Summaries](https://www.floodnet.nyc/flood-event-summaries): How the event summary statistics are generated, plus visualizations for a subset of measured floods.
+- [FloodNet Documentation](https://floodnet-nyc.github.io/): Technical documentation covering the sensor network, the real-time data pipeline, quality assurance, and quality control.
+- [Science and Resilience Institute at Jamaica Bay (SRIJB) — FloodNet NYC](https://srijb.org/floodnet-nyc/): Institutional context and community engagement resources, including the FloodNet Community Engagement Network Map.
+
 # 5. Say Hello!
 Feel free to reach out.
 - LinkedIn: [markebauer](https://www.linkedin.com/in/markebauer/)   
