@@ -402,7 +402,7 @@ def plot_flood_event(
 
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.plot(timestamps, depths, marker="o", linestyle="-")
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d/%y %H:%M"))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d/%y %H:%M", tz=start_time.tzinfo))
     fig.autofmt_xdate(rotation=30, ha="right")
 
     title_start = start_time.strftime("%m/%d/%y %H:%M")
@@ -665,7 +665,6 @@ def plot_storm_events(
             ax.legend(title="Sensor", loc="upper right", fontsize=8, title_fontsize=9)
 
         fig.autofmt_xdate()
-        fig.tight_layout()
 
     return fig, ax
 
