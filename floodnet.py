@@ -1,10 +1,24 @@
-# floodnet.py
+"""FloodNet flood-event analysis, plotting, and NYC Open Data I/O.
+
+This module is organized into sections that map cleanly onto a future package
+split, so breaking it apart later is mostly a matter of moving each section
+into its own module:
+
+    Constants   ->  constants.py   (COLORBLIND_PALETTE)
+    Data I/O    ->  data.py        (download_*, dataset_*)
+    Analysis    ->  analysis.py    (time_to_threshold)
+    Plotting    ->  plotting.py    (plot_*)
+
+Note: ``plot_ranked_sensors`` operates on geopandas ``GeoDataFrame`` objects
+that the caller passes in. geopandas is intentionally NOT imported here, so the
+module still imports in environments where geopandas is not installed.
+"""
+
 # Standard library
-import os
-import json
 import ast
+import json
+import os
 from datetime import datetime, timedelta
-import requests
 from pathlib import Path
 
 # Third-party libraries
@@ -12,6 +26,12 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
+import requests
+
+
+# ===========================================================================
+# Constants
+# ===========================================================================
 
 # Colorblind-friendly palette (Paul Tol's bright scheme)
 COLORBLIND_PALETTE = [
@@ -26,9 +46,255 @@ COLORBLIND_PALETTE = [
 ]
 
 
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# Data I/O (NYC Open Data)
+# ===========================================================================
+
+def download_data(
+    dataset_id: str,
+    local_file: str,
+    base_url="https://data.cityofnewyork.us",
+    **params
+) -> None:
+    """
+    Download a dataset from NYC Open Data using dataset_id.
+    """
+
+    # Build URL internally
+    url = f"{base_url}/resource/{dataset_id}.csv"
+
+    os.makedirs(os.path.dirname(local_file), exist_ok=True)
+
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+
+    print(f"Downloading from: {response.url}\n")
+
+    with open(local_file, "wb") as f:
+        f.write(response.content)
+
+
+def download_attachments(
+    dataset_id,
+    folder="data",
+    base_url="https://data.cityofnewyork.us"
+):
+    """Download all attachments for a given NYC Open Data dataset.
+    
+    Parameters
+    ----------
+    dataset_id : str
+        The NYC Open Data dataset ID.
+    folder : str
+        Local folder to save attachments to.
+    base_url : str
+        Base URL for the NYC Open Data API.
+    Returns
+    -------
+    list[str]
+        List of saved file paths.
+    """
+    # Fetch the dataset's metadata (the ".json" view describes the dataset,
+    # not its rows) and pull the attachment list out of the nested metadata.
+    metadata = requests.get(f"{base_url}/api/views/{dataset_id}.json").json()
+    attachments = metadata.get("metadata", {}).get("attachments", [])
+
+    # Bail early if this dataset has no attached files.
+    if not attachments:
+        print(f"No attachments found for dataset: {dataset_id}")
+        return []
+
+    # Create the target folder (and any parents); no error if it already exists.
+    Path(folder).mkdir(parents=True, exist_ok=True)
+
+    saved_files = []
+    for attachment in attachments:
+        # Each attachment is identified by an assetId; filename is its display name.
+        filename = attachment["filename"]
+        asset_id = attachment["assetId"]
+
+        # Build the download URL. The assetId locates the file; the filename
+        # query param sets the returned attachment's name.
+        url = f"{base_url}/api/views/{dataset_id}/files/{asset_id}?download=true&filename={filename}"
+
+        response = requests.get(url)
+        response.raise_for_status()  # turn a failed download into an exception
+
+        # Write the raw bytes to disk (binary mode, since these may not be text).
+        filepath = Path(folder) / filename
+        with open(filepath, "wb") as f:
+            f.write(response.content)
+
+        print(f"Saved: {filepath}")
+        saved_files.append(str(filepath))
+
+    return saved_files
+
+
+def dataset_info(
+    dataset_id,
+    base_url="https://data.cityofnewyork.us"
+):
+    """Print dataset metadata from NYC Open Data and update the manifest file.
+
+    Fetches dataset metadata from the Socrata API and prints a structured summary
+    of key fields.
+
+    Parameters
+    ----------
+    dataset_id : str
+        The NYC Open Data dataset ID (e.g. 'kb2e-tjy3').
+    base_url : str
+        Base URL for the NYC Open Data API.
+    """
+
+    def parse_timestamp(ts):
+        """Convert a Unix timestamp to a human-readable date string."""
+        return datetime.fromtimestamp(ts).strftime("%B %d, %Y") if ts else "N/A"
+
+    # fetch dataset metadata from the Socrata API
+    metadata = requests.get(f"{base_url}/api/views/{dataset_id}.json").json()
+
+    # extract attachments (e.g. data dictionaries, description PDFs)
+    attachments = metadata.get("metadata", {}).get("attachments", [])
+
+    # basic info
+    print("=== Dataset Info ===")
+    print(f"Name:                {metadata.get('name')}")
+    print(f"Description:         {metadata.get('description')}")
+    print(f"Date Created:        {parse_timestamp(metadata.get('createdAt'))}")
+    print(f"Data Last Updated:   {parse_timestamp(metadata.get('rowsUpdatedAt'))}")
+    print(f"Metadata Updated:    {parse_timestamp(metadata.get('metadataUpdatedAt'))}")
+    print(f"Views:               {metadata.get('viewCount')}")
+    print(f"Downloads:           {metadata.get('downloadCount')}")
+
+    # attribution
+    print("\n=== Attribution ===")
+    print(f"Data Provided By:    {metadata.get('attribution')}")
+    print(f"Source Link:         {metadata.get('attributionLink')}")
+
+    # tags
+    print("\n=== Tags ===")
+    print(", ".join(metadata.get("tags", [])))
+
+    # license
+    print("\n=== License ===")
+    print(metadata.get("licenseId", "Unspecified"))
+
+    # attachments (e.g. data dictionary, data description PDF)
+    print("\n=== Attachments ===")
+    for attachment in attachments:
+        print(f"  - {attachment['filename']}")
+
+    # owner
+    print("\n=== Owner ===")
+    owner = metadata.get("owner", {})
+    print(f"Dataset Owner:       {owner.get('displayName')}")
+
+    # publication
+    print("\n=== Publication ===")
+    print(f"Date Made Public:    {parse_timestamp(metadata.get('publicationDate'))}")
+    print(f"Category:            {metadata.get('category')}")
+    print(f"Provenance:          {metadata.get('provenance')}")
+
+    # engagement
+    print("\n=== Engagement ===")
+    print(f"Average Rating:      {metadata.get('averageRating')}")
+    print(f"Total Times Rated:   {metadata.get('totalTimesRated')}")
+    print(f"Number of Comments:  {metadata.get('numberOfComments')}")
+
+    # column names and data types
+    print("\n=== Columns ===")
+    for col in metadata.get("columns", []):
+        print(f"  - {col.get('fieldName'):30} {col.get('dataTypeName')}")
+
+
+def dataset_manifest(
+    dataset_id,
+    row_count=None,
+    column_count=None,
+    base_url="https://data.cityofnewyork.us",
+    manifest_path="data/manifest.json"
+):
+    """Create/update a manifest file with dataset metadata."""
+
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    def parse_ts(ts):
+        return (
+            datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+            if ts else None
+        )
+
+    # Views API
+    views = requests.get(f"{base_url}/api/views/{dataset_id}.json").json()
+
+    # Catalog API
+    catalog = requests.get(
+        f"{base_url}/api/catalog/v1",
+        params={"ids": dataset_id}
+    ).json()
+
+    catalog_result = catalog.get("results", [{}])[0]
+    classification = catalog_result.get("classification", {})
+    metadata = catalog_result.get("metadata", {})
+
+    # Build record
+    record = {
+        "dataset_id": dataset_id,
+        "name": views.get("name"),
+
+        "data_updated": parse_ts(views.get("rowsUpdatedAt")),
+        "metadata_updated": parse_ts(views.get("metadataUpdatedAt")),
+
+        "view_count": views.get("viewCount"),
+        "download_count": views.get("downloadCount"),
+        "comment_count": views.get("numberOfComments"),
+        "average_rating": views.get("averageRating"),
+
+        "category": classification.get("domain_category"),
+        "tags": classification.get("tags") or ["unclassified"],
+        "update_frequency": metadata.get("update_frequency") or "unknown",
+
+        "row_count": row_count,
+        "column_count": column_count,
+
+        "data_url": f"{base_url}/resource/{dataset_id}.csv",
+
+        "downloaded_at": today,
+        "last_checked_at": today,
+    }
+
+    # Ensure directory exists
+    path = Path(manifest_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Load or initialize manifest
+    if path.exists():
+        try:
+            manifest = json.loads(path.read_text())
+        except json.JSONDecodeError:
+            # corrupted file fallback
+            manifest = {"datasets": []}
+    else:
+        manifest = {"datasets": []}
+
+    # Upsert record
+    manifest["datasets"] = [
+        d for d in manifest["datasets"]
+        if d["dataset_id"] != dataset_id
+    ]
+    manifest["datasets"].append(record)
+
+    # Save
+    path.write_text(json.dumps(manifest, indent=2))
+
+    print(f"Manifest updated: {manifest_path}")
+
+
+# ===========================================================================
 # Analysis
-# ---------------------------------------------------------------------------
+# ===========================================================================
 
 def time_to_threshold(
     df,
@@ -210,9 +476,9 @@ def time_to_threshold(
     )
 
 
-# ---------------------------------------------------------------------------
+# ===========================================================================
 # Plotting
-# ---------------------------------------------------------------------------
+# ===========================================================================
 
 def plot_threshold_crossings(
     profiles,
@@ -779,330 +1045,3 @@ def plot_ranked_sensors(
     plt.tight_layout()
 
     return fig, ax
-
-
-def download_attachments(
-    dataset_id,
-    folder="data",
-    base_url="https://data.cityofnewyork.us"
-):
-    """Download all attachments for a given NYC Open Data dataset.
-    
-    Parameters
-    ----------
-    dataset_id : str
-        The NYC Open Data dataset ID.
-    folder : str
-        Local folder to save attachments to.
-    base_url : str
-        Base URL for the NYC Open Data API.
-    Returns
-    -------
-    list[str]
-        List of saved file paths.
-    """
-    # Fetch the dataset's metadata (the ".json" view describes the dataset,
-    # not its rows) and pull the attachment list out of the nested metadata.
-    metadata = requests.get(f"{base_url}/api/views/{dataset_id}.json").json()
-    attachments = metadata.get("metadata", {}).get("attachments", [])
-
-    # Bail early if this dataset has no attached files.
-    if not attachments:
-        print(f"No attachments found for dataset: {dataset_id}")
-        return []
-
-    # Create the target folder (and any parents); no error if it already exists.
-    Path(folder).mkdir(parents=True, exist_ok=True)
-
-    saved_files = []
-    for attachment in attachments:
-        # Each attachment is identified by an assetId; filename is its display name.
-        filename = attachment["filename"]
-        asset_id = attachment["assetId"]
-
-        # Build the download URL. The assetId locates the file; the filename
-        # query param sets the returned attachment's name.
-        url = f"{base_url}/api/views/{dataset_id}/files/{asset_id}?download=true&filename={filename}"
-
-        response = requests.get(url)
-        response.raise_for_status()  # turn a failed download into an exception
-
-        # Write the raw bytes to disk (binary mode, since these may not be text).
-        filepath = Path(folder) / filename
-        with open(filepath, "wb") as f:
-            f.write(response.content)
-
-        print(f"Saved: {filepath}")
-        saved_files.append(str(filepath))
-
-    return saved_files
-
-
-def dataset_info(
-    dataset_id,
-    base_url="https://data.cityofnewyork.us"
-):
-    """Print dataset metadata from NYC Open Data and update the manifest file.
-
-    Fetches dataset metadata from the Socrata API and prints a structured summary
-    of key fields.
-
-    Parameters
-    ----------
-    dataset_id : str
-        The NYC Open Data dataset ID (e.g. 'kb2e-tjy3').
-    base_url : str
-        Base URL for the NYC Open Data API.
-    """
-
-    def parse_timestamp(ts):
-        """Convert a Unix timestamp to a human-readable date string."""
-        return datetime.fromtimestamp(ts).strftime("%B %d, %Y") if ts else "N/A"
-
-    # fetch dataset metadata from the Socrata API
-    metadata = requests.get(f"{base_url}/api/views/{dataset_id}.json").json()
-
-    # extract attachments (e.g. data dictionaries, description PDFs)
-    attachments = metadata.get("metadata", {}).get("attachments", [])
-
-    # basic info
-    print("=== Dataset Info ===")
-    print(f"Name:                {metadata.get('name')}")
-    print(f"Description:         {metadata.get('description')}")
-    print(f"Date Created:        {parse_timestamp(metadata.get('createdAt'))}")
-    print(f"Data Last Updated:   {parse_timestamp(metadata.get('rowsUpdatedAt'))}")
-    print(f"Metadata Updated:    {parse_timestamp(metadata.get('metadataUpdatedAt'))}")
-    print(f"Views:               {metadata.get('viewCount')}")
-    print(f"Downloads:           {metadata.get('downloadCount')}")
-
-    # attribution
-    print("\n=== Attribution ===")
-    print(f"Data Provided By:    {metadata.get('attribution')}")
-    print(f"Source Link:         {metadata.get('attributionLink')}")
-
-    # tags
-    print("\n=== Tags ===")
-    print(", ".join(metadata.get("tags", [])))
-
-    # license
-    print("\n=== License ===")
-    print(metadata.get("licenseId", "Unspecified"))
-
-    # attachments (e.g. data dictionary, data description PDF)
-    print("\n=== Attachments ===")
-    for attachment in attachments:
-        print(f"  - {attachment['filename']}")
-
-    # owner
-    print("\n=== Owner ===")
-    owner = metadata.get("owner", {})
-    print(f"Dataset Owner:       {owner.get('displayName')}")
-
-    # publication
-    print("\n=== Publication ===")
-    print(f"Date Made Public:    {parse_timestamp(metadata.get('publicationDate'))}")
-    print(f"Category:            {metadata.get('category')}")
-    print(f"Provenance:          {metadata.get('provenance')}")
-
-    # engagement
-    print("\n=== Engagement ===")
-    print(f"Average Rating:      {metadata.get('averageRating')}")
-    print(f"Total Times Rated:   {metadata.get('totalTimesRated')}")
-    print(f"Number of Comments:  {metadata.get('numberOfComments')}")
-
-    # column names and data types
-    print("\n=== Columns ===")
-    for col in metadata.get("columns", []):
-        print(f"  - {col.get('fieldName'):30} {col.get('dataTypeName')}")
-
-
-
-def dataset_manifest(
-    dataset_id,
-    row_count=None,
-    column_count=None,
-    base_url="https://data.cityofnewyork.us",
-    manifest_path="data/manifest.json"
-):
-    """Create/update a manifest file with dataset metadata."""
-
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    def parse_ts(ts):
-        return (
-            datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
-            if ts else None
-        )
-
-    # Views API
-    views = requests.get(f"{base_url}/api/views/{dataset_id}.json").json()
-
-    # Catalog API
-    catalog = requests.get(
-        f"{base_url}/api/catalog/v1",
-        params={"ids": dataset_id}
-    ).json()
-
-    catalog_result = catalog.get("results", [{}])[0]
-    classification = catalog_result.get("classification", {})
-    metadata = catalog_result.get("metadata", {})
-
-    # Build record
-    record = {
-        "dataset_id": dataset_id,
-        "name": views.get("name"),
-
-        "data_updated": parse_ts(views.get("rowsUpdatedAt")),
-        "metadata_updated": parse_ts(views.get("metadataUpdatedAt")),
-
-        "view_count": views.get("viewCount"),
-        "download_count": views.get("downloadCount"),
-        "comment_count": views.get("numberOfComments"),
-        "average_rating": views.get("averageRating"),
-
-        "category": classification.get("domain_category"),
-        "tags": classification.get("tags") or ["unclassified"],
-        "update_frequency": metadata.get("update_frequency") or "unknown",
-
-        "row_count": row_count,
-        "column_count": column_count,
-
-        "data_url": f"{base_url}/resource/{dataset_id}.csv",
-
-        "downloaded_at": today,
-        "last_checked_at": today,
-    }
-
-    # Ensure directory exists
-    path = Path(manifest_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Load or initialize manifest
-    if path.exists():
-        try:
-            manifest = json.loads(path.read_text())
-        except json.JSONDecodeError:
-            # corrupted file fallback
-            manifest = {"datasets": []}
-    else:
-        manifest = {"datasets": []}
-
-    # Upsert record
-    manifest["datasets"] = [
-        d for d in manifest["datasets"]
-        if d["dataset_id"] != dataset_id
-    ]
-    manifest["datasets"].append(record)
-
-    # Save
-    path.write_text(json.dumps(manifest, indent=2))
-
-    print(f"Manifest updated: {manifest_path}")
-
-
-def download_data(
-    dataset_id: str,
-    local_file: str,
-    base_url="https://data.cityofnewyork.us",
-    **params
-) -> None:
-    """
-    Download a dataset from NYC Open Data using dataset_id.
-    """
-
-    # Build URL internally
-    url = f"{base_url}/resource/{dataset_id}.csv"
-
-    os.makedirs(os.path.dirname(local_file), exist_ok=True)
-
-    response = requests.get(url, params=params)
-    response.raise_for_status()
-
-    print(f"Downloading from: {response.url}\n")
-
-    with open(local_file, "wb") as f:
-        f.write(response.content)
-
-
-
-def dataset_manifest(
-    dataset_id,
-    row_count=None,
-    column_count=None,
-    base_url="https://data.cityofnewyork.us",
-    manifest_path="data/manifest.json"
-):
-    """Create/update a manifest file with dataset metadata."""
-
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    def parse_ts(ts):
-        return (
-            datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
-            if ts else None
-        )
-
-    # Views API
-    views = requests.get(f"{base_url}/api/views/{dataset_id}.json").json()
-
-    # Catalog API
-    catalog = requests.get(
-        f"{base_url}/api/catalog/v1",
-        params={"ids": dataset_id}
-    ).json()
-
-    catalog_result = catalog.get("results", [{}])[0]
-    classification = catalog_result.get("classification", {})
-    metadata = catalog_result.get("metadata", {})
-
-    # Build record
-    record = {
-        "dataset_id": dataset_id,
-        "name": views.get("name"),
-
-        "data_updated": parse_ts(views.get("rowsUpdatedAt")),
-        "metadata_updated": parse_ts(views.get("metadataUpdatedAt")),
-
-        "view_count": views.get("viewCount"),
-        "download_count": views.get("downloadCount"),
-        "comment_count": views.get("numberOfComments"),
-        "average_rating": views.get("averageRating"),
-
-        "category": classification.get("domain_category"),
-        "tags": classification.get("tags") or ["unclassified"],
-        "update_frequency": metadata.get("update_frequency") or "unknown",
-
-        "row_count": row_count,
-        "column_count": column_count,
-
-        "data_url": f"{base_url}/resource/{dataset_id}.csv",
-
-        "downloaded_at": today,
-        "last_checked_at": today,
-    }
-
-    # Ensure directory exists
-    path = Path(manifest_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Load or initialize manifest
-    if path.exists():
-        try:
-            manifest = json.loads(path.read_text())
-        except json.JSONDecodeError:
-            # corrupted file fallback
-            manifest = {"datasets": []}
-    else:
-        manifest = {"datasets": []}
-
-    # Upsert record
-    manifest["datasets"] = [
-        d for d in manifest["datasets"]
-        if d["dataset_id"] != dataset_id
-    ]
-    manifest["datasets"].append(record)
-
-    # Save
-    path.write_text(json.dumps(manifest, indent=2))
-
-    print(f"Manifest updated: {manifest_path}")                    
