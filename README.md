@@ -27,12 +27,16 @@ The ultimate goal of this project is to promote these datasets for anyone intere
 
 # 2. Notebooks
 - [00-download-data.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/00-download-data.ipynb): How to download the FloodNet NYC data from NYC Open Data.
+
 - [01-load-inspect.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/01-load-inspect.ipynb): Demonstrates how to inspect both the Sensor Metadata and Flood Events datasets.
+
 - [02-sensor-rankings.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/02-sensor-rankings.ipynb): Ranks sensors and flood events by various statistics (e.g., max flood depth).
+
 - [03-flood-profiles.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/03-flood-profiles.ipynb): Teaches how to generate flood profiles and other hydrograph statistics (e.g., rising limb, recession time, etc.).
 
 # 3. Data 
 - Street Flooding Events Measured by FloodNet Sensors. Retrieved from https://data.cityofnewyork.us/Environment/FloodNet-Street-Flooding-Events-Measured-by-FloodN/aq7i-eu5q/about_data
+
 - Sensor Deployment Metadata. Retrieved from https://data.cityofnewyork.us/Environment/FloodNet-Sensor-Deployment-Metadata/kb2e-tjy3/about_data
 
 # 4. FloodNet Resources
