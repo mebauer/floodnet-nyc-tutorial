@@ -16,6 +16,7 @@ module still imports in environments where geopandas is not installed.
 
 # Standard library
 import ast
+import io
 import json
 import os
 from datetime import datetime, timedelta
@@ -239,6 +240,9 @@ def dataset_manifest(
     classification = catalog_result.get("classification", {})
     metadata = catalog_result.get("metadata", {})
 
+    # Newest row-creation timestamp upstream; watermark for "added since".
+    watermark = latest_created_at(dataset_id, base_url=base_url)
+
     # Build record
     record = {
         "dataset_id": dataset_id,
@@ -263,6 +267,10 @@ def dataset_manifest(
 
         "downloaded_at": today,
         "last_checked_at": today,
+
+        # Set below, once the outgoing record is known.
+        "latest_created_at": watermark,
+        "previous_created_at": None,
     }
 
     # Ensure directory exists
@@ -279,6 +287,26 @@ def dataset_manifest(
     else:
         manifest = {"datasets": []}
 
+    # Roll the watermark forward off the record being replaced. Only advance
+    # when upstream actually published new rows, so re-running a download
+    # between refreshes does not discard the point we compare against.
+    outgoing = next(
+        (d for d in manifest["datasets"] if d["dataset_id"] == dataset_id),
+        None
+    )
+    if outgoing:
+        outgoing_watermark = outgoing.get("latest_created_at")
+
+        if watermark is None:
+            # Could not read upstream; keep what we already knew rather than
+            # breaking the chain.
+            record["latest_created_at"] = outgoing_watermark
+            record["previous_created_at"] = outgoing.get("previous_created_at")
+        elif outgoing_watermark != watermark:
+            record["previous_created_at"] = outgoing_watermark
+        else:
+            record["previous_created_at"] = outgoing.get("previous_created_at")
+
     # Upsert record
     manifest["datasets"] = [
         d for d in manifest["datasets"]
@@ -290,6 +318,104 @@ def dataset_manifest(
     path.write_text(json.dumps(manifest, indent=2))
 
     print(f"Manifest updated: {manifest_path}")
+
+
+def latest_created_at(
+    dataset_id,
+    base_url="https://data.cityofnewyork.us"
+):
+    """Return the newest Socrata ``:created_at`` in a dataset, as an ISO string.
+
+    Socrata stamps every row with a ``:created_at`` system field. FloodNet
+    publishes each refresh as a batch of appended rows, so the newest value is a
+    watermark: rows created after it are exactly the rows a later refresh added.
+
+    Args:
+        dataset_id: The NYC Open Data dataset ID (e.g. 'aq7i-eu5q').
+        base_url: Base URL for the NYC Open Data API.
+
+    Returns:
+        The maximum ``:created_at`` (e.g. '2026-09-01T13:00:14.039Z'), or None
+        if the dataset does not expose system fields.
+    """
+    url = f"{base_url}/resource/{dataset_id}.json"
+
+    try:
+        response = requests.get(url, params={"$select": "max(:created_at) as latest"})
+        response.raise_for_status()
+        results = response.json()
+    except (requests.RequestException, ValueError):
+        return None
+
+    if not results:
+        return None
+
+    return results[0].get("latest")
+
+
+def download_new_records(
+    dataset_id,
+    since,
+    inclusive=False,
+    base_url="https://data.cityofnewyork.us",
+    **params
+):
+    """Fetch rows added to a dataset after ``since``.
+
+    Filters on Socrata's ``:created_at`` system field, so this returns the rows
+    a refresh appended rather than the whole table. Unlike ``download_data``,
+    nothing is written to disk — the rows come back as a DataFrame to inspect.
+
+    Args:
+        dataset_id: The NYC Open Data dataset ID (e.g. 'aq7i-eu5q').
+        since: An ISO ``:created_at`` value, typically the watermark saved by a
+            previous download (see ``latest_created_at``). Rows are returned
+            when strictly newer, so passing the current watermark returns
+            nothing.
+        inclusive: Match ``>= since`` instead of ``> since``. Passing the
+            current watermark with this set returns the most recent batch,
+            which is useful before any previous watermark has been recorded.
+        base_url: Base URL for the NYC Open Data API.
+        **params: Extra Socrata query params. ``$limit`` defaults to 500,000 so
+            the API does not silently return a truncated sample.
+
+    Returns:
+        Polars DataFrame of the added rows, with the dataset's own columns plus
+        a parsed ``created_at``. Empty frame if nothing is newer than ``since``.
+    """
+    url = f"{base_url}/resource/{dataset_id}.csv"
+
+    operator = ">=" if inclusive else ">"
+
+    params = {
+        # Socrata hides :id/:created_at/:updated_at unless asked for them.
+        "$$exclude_system_fields": "false",
+        "$where": f":created_at {operator} '{since}'",
+        "$limit": 500_000,
+        **params,
+    }
+
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+
+    print(f"Downloading from: {response.url}\n")
+
+    df = pl.read_csv(
+        io.BytesIO(response.content),
+        # some columns have sparse data, need to expand the row count
+        infer_schema_length=100_000,
+        try_parse_dates=True,
+    )
+
+    if df.is_empty():
+        return df
+
+    # Keep the dataset's own columns plus created_at. :updated_at always equals
+    # :created_at here (rows are appended, never edited), and :id is unused.
+    return (
+        df.rename({":created_at": "created_at"})
+          .drop(":id", ":updated_at", strict=False)
+    )
 
 
 # ===========================================================================
