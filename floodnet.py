@@ -398,7 +398,7 @@ def download_new_records(
     response = requests.get(url, params=params)
     response.raise_for_status()
 
-    print(f"Downloading from: {response.url}\n")
+    print(f"Downloading from:\n{response.url}\n")
 
     df = pl.read_csv(
         io.BytesIO(response.content),
