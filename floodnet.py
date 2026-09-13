@@ -6,7 +6,7 @@ into its own module:
 
     Constants   ->  constants.py   (COLORBLIND_PALETTE)
     Data I/O    ->  data.py        (download_*, dataset_*)
-    Analysis    ->  analysis.py    (time_to_threshold)
+    Analysis    ->  analysis.py    (time_to_threshold, storm_events)
     Plotting    ->  plotting.py    (plot_*)
 
 Note: ``plot_ranked_sensors`` operates on geopandas ``GeoDataFrame`` objects
@@ -602,6 +602,166 @@ def time_to_threshold(
     )
 
 
+def _select_storm_events(
+    df,
+    date_storm,
+    time_buffer: int,
+    start_col: str,
+    end_col: str,
+    max_col: str,
+    ts_sec_col: str,
+    ts_in_col: str,
+    min_depth_inches: float,
+):
+    """Select the flood events that fall inside one storm's window.
+
+    Shared by `storm_events` and `plot_storm_events` so the table and the
+    figure always describe the same set of events.
+
+    Returns:
+        (events, storm_dt, window_start, window_end): events sorted by start
+        time, possibly empty; the anchor date truncated to local midnight; and
+        the window bounds the events were selected against.
+
+    Raises:
+        ValueError: Empty frame.
+    """
+    if df is None:
+        raise ValueError("df is empty.")
+
+    if not isinstance(df, pl.DataFrame):
+        df = pl.from_pandas(df)
+
+    if df.is_empty():
+        raise ValueError("df is empty.")
+
+    # --- Match storm datetime timezone to dataframe
+    # Borrow the column's zone so comparisons below don't mix naive and aware.
+    tz = df.schema[start_col].time_zone
+
+    storm_dt = (
+        pl.Series([date_storm])
+        .str.to_datetime()
+        .dt.replace_time_zone(tz)
+        .item()
+    ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Symmetric buffer: time_buffer hours before storm start and after storm end (24h window)
+    window_start = storm_dt - timedelta(hours=time_buffer)
+    window_end = storm_dt + timedelta(hours=24) + timedelta(hours=time_buffer)
+
+    # --- Select events overlapping the storm window
+    # Overlap, not containment: an event straddling either edge still counts.
+    events = (
+        df.filter(
+            (pl.col(end_col) >= window_start)
+            & (pl.col(start_col) <= window_end)
+            & (pl.col(max_col) > min_depth_inches)
+            & pl.col(ts_sec_col).is_not_null()
+            & pl.col(ts_in_col).is_not_null()
+        )
+        .sort(start_col)
+    )
+
+    return events, storm_dt, window_start, window_end
+
+
+def storm_events(
+    df,
+    date_storm,
+    time_buffer: int,
+    storm_name: str,
+    start_col: str = "flood_start_time_et",
+    end_col: str = "flood_end_time_et",
+    max_col: str = "max_depth_inches",
+    ts_sec_col: str = "flood_profile_time_secs",
+    ts_in_col: str = "flood_profile_depth_inches",
+    min_depth_inches: float = 2.0,
+):
+    """Table the curves `plot_storm_events` draws, one row per flood event.
+
+    Same window and depth filtering as the plot, so the rows match the curves
+    on the figure. The window is what defines the storm, not any single date:
+    a storm that starts at 11pm spills its flooding into the next calendar day,
+    so grouping by the events' own start date would split one storm in two.
+    Hurricane Ida is the clearest case -- every NYC flood event the notebook
+    attributes to Ida starts on 2021-09-01, the day before the storm is named
+    for.
+
+    Each row therefore carries the window it was selected by, so a count is
+    reproducible from the table alone. Counting flooded sensors means counting
+    distinct sensors, not rows -- one sensor can log several events in a storm
+    when its depth dips back under the flood threshold and rises again:
+
+        table.group_by("storm_name").agg(
+            pl.col("sensor_id").n_unique().alias("sensors_flooded")
+        )
+
+    Args:
+        df: One row per flood event. Pandas accepted.
+        date_storm: Anchor date string; parsed then truncated to local midnight.
+            Only a window bound -- it is not reported as the date of any flood.
+        time_buffer: Hours of padding on each side of the 24-hour storm day.
+        storm_name: Label stamped on every returned row; the grouping key.
+        start_col: Event start; also the sort key.
+        end_col: Event end; used for window overlap.
+        max_col: Event peak; events at or below `min_depth_inches` are dropped.
+        ts_sec_col: List column of elapsed seconds; rows missing it are dropped.
+        ts_in_col: List column of depths; rows missing it are dropped.
+        min_depth_inches: Exclusive floor on peak depth.
+
+    Returns:
+        Matched events with `storm_name`, `window_start`, `window_end`, and
+        `min_depth_inches` prepended and the two profile list columns dropped
+        -- every other input column, including anything joined in by the
+        caller, is carried through. Empty frame if no events overlap the
+        window.
+
+    Note:
+        Counts are not comparable across storms without accounting for how
+        many sensors were deployed at the time. The FloodNet network grew from
+        9 sensors in 2021 to over 300 by 2025, so a raw count across years
+        largely measures deployment history. `window_end - window_start` also
+        varies with `time_buffer`, so storms compared by count should share a
+        buffer.
+
+    Raises:
+        ValueError: df is None, or empty before window filtering.
+    """
+    events, _, window_start, window_end = _select_storm_events(
+        df,
+        date_storm,
+        time_buffer,
+        start_col=start_col,
+        end_col=end_col,
+        max_col=max_col,
+        ts_sec_col=ts_sec_col,
+        ts_in_col=ts_in_col,
+        min_depth_inches=min_depth_inches,
+    )
+
+    # Drop columns we're about to (re)compute -- ts/depth because the figure
+    # needs them but a table reads better without them, and the provenance
+    # names in case `df` is itself a prior `storm_events()` result, so the
+    # select below doesn't collide with stale values from that earlier call.
+    reserved = ("storm_name", "window_start", "window_end", "min_depth_inches")
+    events = events.drop(
+        [c for c in (ts_sec_col, ts_in_col) + reserved if c in events.columns]
+    )
+
+    # Match the event timestamps so the bounds compare against them directly.
+    # Works for a 0-row frame too: literals still broadcast against no rows.
+    dt_dtype = events.schema[start_col]
+
+    return events.select(
+        pl.lit(storm_name).alias("storm_name"),
+        pl.lit(window_start).cast(dt_dtype).alias("window_start"),
+        pl.lit(window_end).cast(dt_dtype).alias("window_end"),
+        pl.lit(float(min_depth_inches)).alias("min_depth_inches"),
+        pl.all(),
+    )
+
+
 # ===========================================================================
 # Plotting
 # ===========================================================================
@@ -911,41 +1071,16 @@ def plot_storm_events(
     Raises:
         ValueError: Empty frame, or no events overlapping the window.
     """
-    if df is None:
-        raise ValueError("df is empty.")
-
-    if not isinstance(df, pl.DataFrame):
-        df = pl.from_pandas(df)
-
-    if df.is_empty():
-        raise ValueError("df is empty.")
-
-    # --- Match storm datetime timezone to dataframe
-    # Borrow the column's zone so comparisons below don't mix naive and aware.
-    tz = df.schema[start_col].time_zone
-
-    storm_dt = (
-        pl.Series([date_storm])
-        .str.to_datetime()
-        .dt.replace_time_zone(tz)
-        .item()
-    ).replace(hour=0, minute=0, second=0, microsecond=0)
-
-    # Symmetric buffer: time_buffer hours before storm start and after storm end (24h window)
-    window_start = storm_dt - timedelta(hours=time_buffer)
-    window_end = storm_dt + timedelta(hours=24) + timedelta(hours=time_buffer)
-
-    # --- Select events overlapping the storm window
-    # Overlap, not containment: an event straddling either edge still counts.
-    events = (
-        df.filter(
-            (pl.col(end_col) >= window_start)
-            & (pl.col(start_col) <= window_end)
-            & (pl.col(max_col) > min_depth_inches)
-            & pl.col(ts_sec_col).is_not_null()
-            & pl.col(ts_in_col).is_not_null()
-        )
-        .sort(start_col)
+    events, storm_dt, _, _ = _select_storm_events(
+        df,
+        date_storm,
+        time_buffer,
+        start_col=start_col,
+        end_col=end_col,
+        max_col=max_col,
+        ts_sec_col=ts_sec_col,
+        ts_in_col=ts_in_col,
+        min_depth_inches=min_depth_inches,
     )
 
     if events.is_empty():
