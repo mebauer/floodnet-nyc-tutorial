@@ -87,12 +87,7 @@ Real NYC drainage areas, modeled and documented — worked examples of how
 hydrologic, hydraulic, terrain, and infrastructure concepts get applied to
 this city's actual sewersheds and storms. These are not required reading from beginning to end. Use them as worked examples after learning the canonical resources above: each emphasizes a different part of the rainfall → runoff → terrain → sewer → flooding chain.
 
-- [Tallman Island Sewershed Study (2026)](https://www.sciencedirect.com/science/article/pii/S221458182600162X):
-  **Sewer-system performance.** Couples the InfoWorks-derived NYC sewer
-  network for Tallman Island with EPA SWMM/PySWMM to identify critical nodes
-  and link extreme rainfall, imperviousness, hydraulic constraints, pipe
-  fullness, and ponding — the closest thing to a full diagnostic chain on
-  real NYC infrastructure.
+## NYC Case Studies
 
 - [FiDi & Seaport Master Plan — Stormwater Management Studies (NYC EDC, 2024)](https://edc.nyc/sites/default/files/2024-03/FiDi-Master-Plan-Stormwater-Management-Studies.pdf):
   **Model refinement (1D-2D).** Shows a coarse citywide LTCP model (~30,000 ft
@@ -120,15 +115,19 @@ this city's actual sewersheds and storms. These are not required reading from be
   storage alternatives. Read right after Flushing Bay — same strategy, harder
   system.
 
-- [Compounding effects of changing sea level and rainfall regimes on pluvial flooding in NYC (*Natural Hazards*, 2024)](https://link.springer.com/article/10.1007/s11069-024-06466-8):
-  **Citywide boundary conditions.** Uses a citywide hydrologic/hydraulic
-  model to investigate how rainfall intensity/duration combined with sea
-  level or surge affects pluvial flooding and gravity drainage at outfalls.
-
 - [NYC Cloudburst Resiliency Planning Study](https://www.nyc.gov/assets/dep/downloads/pdf/climate-resiliency/nyc-cloudburst-study.pdf):
   **Surface exceedance pathways.** Southeast Queens: terrain, overland flow
   paths, and surface storage for rainfall that exceeds sewer capacity — the
   flooding mode conventional sewer models handle least well.
+
+## Academic Case Studies
+
+- [Tallman Island Sewershed Study (2026)](https://www.sciencedirect.com/science/article/pii/S221458182600162X):
+  **Sewer-system performance.** Couples the InfoWorks-derived NYC sewer
+  network for Tallman Island with EPA SWMM/PySWMM to identify critical nodes
+  and link extreme rainfall, imperviousness, hydraulic constraints, pipe
+  fullness, and ponding — the closest thing to a full diagnostic chain on
+  real NYC infrastructure.
 
 - [Pluvial and potential compound flooding in a coupled coastal modeling framework: NYC during post-tropical Cyclone Ida (2021) (*HESS*, 2025)](https://hess.copernicus.org/articles/29/2043/2025/):
   **Observed-event reconstruction.** Reconstructs Ida across the Jamaica Bay
@@ -137,7 +136,12 @@ this city's actual sewersheds and storms. These are not required reading from be
   an explicit sewer network. Validated against surveyed high-water marks —
   plus 10 FloodNet gauges from a separate September 2023 storm used as extra
   calibration points — reaching ~20 cm RMSE. The natural bridge to the
-  FloodNet-utilized papers.
+  FloodNet-utilized papers.  
+
+- [Compounding effects of changing sea level and rainfall regimes on pluvial flooding in NYC (*Natural Hazards*, 2024)](https://link.springer.com/article/10.1007/s11069-024-06466-8):
+  **Citywide boundary conditions.** Uses a citywide hydrologic/hydraulic
+  model to investigate how rainfall intensity/duration combined with sea
+  level or surge affects pluvial flooding and gravity drainage at outfalls.  
 
 # 7. Related Projects
 - [mebauer/nyc-flood-data](https://github.com/mebauer/nyc-flood-data): Flood Data for NYC — a comprehensive, reproducible inventory of flood-related datasets across NYC Open Data.
