@@ -78,9 +78,9 @@ The NYC resources below are the ones worth knowing if you want to become very go
 
 6. [NYC DEP Sewer Design Standards (Sept 2025)](https://www.nyc.gov/assets/ddc/downloads/publications/NYCDEPSEWERDESIGNSTANDARDS_RevisedSep2025.pdf) — The physical-engineering layer: pipe sizing, catch basins, velocities, and manhole spacing. FloodNet tells you what happened at the street; this tells you what the underground system was designed to handle. (September 2025 revision.)
 
-7. [NYC Cloudburst Resiliency Planning Study](https://www.nyc.gov/assets/dep/downloads/pdf/climate-resiliency/nyc-cloudburst-study.pdf) — Extreme short-duration rainfall, topography, and overland surface-flow pathways — conceptually the closest match to the pluvial flooding FloodNet is uniquely positioned to observe. Also the origin of NYC's cloudburst-management program.
+7. [NYC Stormwater Management Program Plan (MS4)](https://www.nyc.gov/site/dep/water/municipal-separate-storm-sewer-system.page) — The combined-vs-separate sewer distinction, the MS4 drainage map, and the storm-sewershed inventory. Directly changes how a given sensor behaves, and clarifies the difference between a topographic contributing area and an infrastructure-defined sewershed.
 
-8. [NYC Stormwater Management Program Plan (MS4)](https://www.nyc.gov/site/dep/water/municipal-separate-storm-sewer-system.page) — The combined-vs-separate sewer distinction, the MS4 drainage map, and the storm-sewershed inventory. Directly changes how a given sensor behaves, and clarifies the difference between a topographic contributing area and an infrastructure-defined sewershed.
+8. [DEP Standard Sewer and Water Main Specifications, 2022](https://www.nyc.gov/assets/ddc/downloads/publications/scops/NYCDEPStandard%20Sewer_WaterSpecifications_2022-08-08.pdf) - Construction materials, installation requirements and contract specifications. Important when translating an engineered design into a buildable project.
 
 # 6. Case Studies
 Real NYC drainage areas, modeled and documented — worked examples of how
@@ -142,6 +142,22 @@ this city's actual sewersheds and storms. These are not required reading from be
   **Citywide boundary conditions.** Uses a citywide hydrologic/hydraulic
   model to investigate how rainfall intensity/duration combined with sea
   level or surge affects pluvial flooding and gravity drainage at outfalls.  
+
+## Additional Drainage Resources  
+
+1. [Storm Water Management Model (SWMM) Homepage](https://www.epa.gov/water-research/storm-water-management-model-swmm) - EPA's Storm Water Management Model (SWMM) is used throughout the world for decision support, emergency response, planning, analysis, and design related to stormwater, combined, and sanitary sewer systems as well as for other drainage systems. It can be used to evaluate gray infrastructure stormwater control strategies, such as pipes and storm drains, and is a useful tool for creating cost-effective hybrid green/gray stormwater control solutions. SWMM was developed to help support local, state, and national stormwater management objectives to reduce runoff through infiltration and retention and help to reduce discharges that cause impairment to receiving waterbodies.
+
+2. [EPA SWMM Fact Sheet](https://www.epa.gov/sites/default/files/2016-09/documents/swmm_factsheet_final_16sep01-508_compliant.pdf) - A concise introduction to what SWMM does, its applications and its hydrologic and hydraulic modeling capabilities. 
+
+3. [SWMM 5.2 User's Manual](https://www.epa.gov/system/files/documents/2022-04/swmm-users-manual-version-5.2.pdf) — These explain the mathematical and computational foundations of SWMM, including runoff generation, infiltration, subcatchments, flow routing, sewer surcharge and flooding. The EPA also provides an applications manual and model documentation.
+
+4. [SWMM Reference Manual, Volume I — Hydrology, 2016](https://nepis.epa.gov/Exe/ZyPDF.cgi/P100NYRA.PDF?Dockey=P100NYRA.PDF) — Explains how SWMM transforms rainfall into runoff, including infiltration, imperviousness, depression storage and subcatchment routing. This is the theoretical foundation for connecting rainfall measurements to FloodNet observations.
+
+5. [SWMM Reference Manual, Volume I — Hydraulics, 2017](https://nepis.epa.gov/Exe/ZyPDF.cgi/P100S9AS.PDF?Dockey=P100S9AS.PDF) — Explains how water moves through pipes, channels, junctions and storage units, including dynamic-wave routing, backwater and surcharge. Critical for investigating whether underground drainage capacity contributed to street flooding.
+
+6. [FHWA HEC-22: Urban Drainage Design Fourth edition, 2024](https://www.nyc.gov/assets/orr/pdf/publications/stormwater-resiliency-plan.pdf) — The detailed technical companion for estimating runoff, analyzing gutter flow, calculating inlet interception and designing storm-drain piping. Especially useful for investigating why water accumulates near a catch basin.
+
+7. [NOAA Atlas 14](https://www.nyc.gov/assets/orr/pdf/publications/stormwater-resiliency-plan.pdf) — The authoritative source for precipitation-frequency estimates, including the rainfall depths and intensities used to develop design storms. For NYC, use the Northeast volume and location-specific data from NOAA's server.
 
 # 7. Related Projects
 - [mebauer/nyc-flood-data](https://github.com/mebauer/nyc-flood-data): Flood Data for NYC — a comprehensive, reproducible inventory of flood-related datasets across NYC Open Data.
