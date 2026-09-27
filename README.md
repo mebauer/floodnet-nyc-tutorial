@@ -49,6 +49,13 @@ Start here to understand the FloodNet sensor network, datasets, methodology, qua
 
 * [Silverman et al. (2022) — *Making Waves: Uses of Real-Time, Hyperlocal Flood Sensor Data for Emergency Management, Resiliency Planning, and Flood Impact Mitigation*](https://doi.org/10.1016/j.watres.2022.118648): Foundational paper examining how hyperlocal flood measurements can support emergency management, resilience planning, research, and flood-impact mitigation.
 
+* [Ceferino et al. (2023) — Developing a Framework to Optimize FloodNet Sensor Deployments around NYC for Equitable and Impact-Based Hyper-Local Street-Level Flood Monitoring and Data Collection](https://rosap.ntl.bts.gov/view/dot/68526): Research report presenting a framework for optimizing FloodNet sensor placement across New York City, emphasizing equitable deployment, flood impacts, and improved spatial coverage of hyperlocal street-level flooding.
+
+## Community Engagement
+
+* [FloodNet Community Engagement](https://www.floodnet.nyc/community-engagement) — Through the integration of a designated community engagement (CE) team, FloodNet NYC aims to foster sustainable impact within communities most at risk. Informed by community-based participation research methodology and implementation frameworks, our CE strategy has three prongs--community outreach, community education, and community action--and leverages a public health lens to ground our approach in both theory and practice.
+
+
 ## FloodNet Project & Methodology
 
 * [FloodNet NYC](https://www.floodnet.nyc): The project's main website and central starting point for information about the FloodNet NYC program.
