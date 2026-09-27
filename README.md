@@ -67,7 +67,7 @@ Start here to understand the FloodNet sensor network, datasets, methodology, qua
 
 Official NYC resources for understanding stormwater runoff, sewer hydraulics, drainage infrastructure and modeled flood risk.
 
-1. [NYC DEP — 2021 Stormwater Resiliency Plan](https://www.nyc.gov/assets/orr/pdf/publications/stormwater-resiliency-plan.pdf) — Methodology behind NYC's Stormwater Flood Maps, including coupled 1D–2D hydraulic modeling and design-storm scenarios.
+1. [NYC DEP — 2021 Stormwater Resiliency Plan](https://www.nyc.gov/assets/orr/pdf/publications/stormwater-resiliency-plan.pdf) — Methodology behind NYC's Stormwater Flood Maps, including coupled 1D–2D hydraulic modeling and design-storm scenarios. Read the modeling methodology section and Appendix B.
 
 2. [NYC DEP — 2024 Stormwater Analysis](https://www.nyc.gov/assets/dep/downloads/pdf/water/stormwater/2024-stormwater-analysis-report.pdf) — Citywide hydraulic modeling, 86 priority drainage areas and neighborhood flood-risk assessments.
 
