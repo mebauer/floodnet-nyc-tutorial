@@ -34,6 +34,8 @@ The ultimate goal of this project is to promote these datasets for anyone intere
 
 - [03-flood-profiles.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/03-flood-profiles.ipynb): Teaches how to generate flood profiles and other hydrograph statistics (e.g., rising limb, recession time, etc.).
 
+- [04-latest-refresh.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/04-latest-refresh.ipynb): Shows the flood events added in the most recent data refresh and how they rank against every event on record.
+
 # 3. Data 
 - Street Flooding Events Measured by FloodNet Sensors. Retrieved from https://data.cityofnewyork.us/Environment/FloodNet-Street-Flooding-Events-Measured-by-FloodN/aq7i-eu5q/about_data
 
