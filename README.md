@@ -36,6 +36,8 @@ The ultimate goal of this project is to promote these datasets for anyone intere
 
 - [04-latest-refresh.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/04-latest-refresh.ipynb): Shows the flood events added in the most recent data refresh and how they rank against every event on record.
 
+- [05-temporal-patterns.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/05-temporal-patterns.ipynb): Explores when rain-driven flooding happens, and how to count it: separating tidal from rain-driven flooding, depth thresholds, grouping events into storm episodes, why raw counts mislead, seasonality, time of day, and widespread storms, with "what not to do" notes and the limits of what this data can tell us.
+
 # 3. Data 
 - Street Flooding Events Measured by FloodNet Sensors. Retrieved from https://data.cityofnewyork.us/Environment/FloodNet-Street-Flooding-Events-Measured-by-FloodN/aq7i-eu5q/about_data
 
