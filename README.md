@@ -38,6 +38,8 @@ The ultimate goal of this project is to promote these datasets for anyone intere
 
 - [05-temporal-patterns.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/05-temporal-patterns.ipynb): Explores when rain-driven flooding happens, and how to count it: separating tidal from rain-driven flooding, depth thresholds, grouping events into storm episodes, why raw counts mislead, seasonality, time of day, and widespread storms, with "what not to do" notes and the limits of what this data can tell us.
 
+- [06-rain-episodes.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/06-rain-episodes.ipynb): Checks the rain-episode grouping introduced in notebook 05: a storm walked through event by event, why the gap is measured against a running maximum, how sensitive the results are to the 6-hour threshold, and what the grouping produced across the whole record.
+
 # 3. Data 
 - Street Flooding Events Measured by FloodNet Sensors. Retrieved from https://data.cityofnewyork.us/Environment/FloodNet-Street-Flooding-Events-Measured-by-FloodN/aq7i-eu5q/about_data
 
