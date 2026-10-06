@@ -40,6 +40,8 @@ The ultimate goal of this project is to promote these datasets for anyone intere
 
 - [06-rain-episodes.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/06-rain-episodes.ipynb): Checks the rain-episode grouping introduced in notebook 05: a storm walked through event by event, why the gap is measured against a running maximum, how sensitive the results are to the 6-hour threshold, and what the grouping produced across the whole record.
 
+- [07-rise-and-peak-depth.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/07-rise-and-peak-depth.ipynb): Asks whether water that rises faster also gets deeper: how often flooding reaches 12 inches, time and rate of rise to a foot of water at tidal vs. non-tidal sensors, rank correlation on skewed data, and two checks on that correlation (measuring the rise away from the peak, and separating storm from site).
+
 # 3. Data 
 - Street Flooding Events Measured by FloodNet Sensors. Retrieved from https://data.cityofnewyork.us/Environment/FloodNet-Street-Flooding-Events-Measured-by-FloodN/aq7i-eu5q/about_data
 
