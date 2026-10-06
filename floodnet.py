@@ -6,7 +6,8 @@ into its own module:
 
     Constants   ->  constants.py   (COLORBLIND_PALETTE)
     Data I/O    ->  data.py        (download_*, dataset_*)
-    Analysis    ->  analysis.py    (time_to_threshold, storm_events)
+    Analysis    ->  analysis.py    (time_to_threshold, storm_events,
+                                    build_rain_episodes)
     Plotting    ->  plotting.py    (plot_*)
 
 Note: ``plot_ranked_sensors`` operates on geopandas ``GeoDataFrame`` objects
@@ -760,6 +761,114 @@ def storm_events(
         pl.lit(float(min_depth_inches)).alias("min_depth_inches"),
         pl.all(),
     )
+
+
+def build_rain_episodes(
+    df,
+    gap_hours: float = 6,
+    depth_threshold_inches: float = 4,
+    severe_threshold_inches: float = 12,
+    start_col: str = "flood_start_time_et",
+    end_col: str = "flood_end_time_et",
+    max_col: str = "max_depth_inches",
+):
+    """Group flood events into rain episodes with an interevent dry-period rule.
+
+    Events are sorted by start time and walked in order. An event starts a new
+    episode when it begins more than `gap_hours` after the latest end time of
+    every earlier event; otherwise it joins the current episode. Comparing
+    against the running maximum end time (`cum_max`), not the previous row,
+    keeps a long flood at one sensor from being split by shorter floods that
+    start and finish inside it.
+
+    The 6-hour default follows the dry period commonly used to separate one
+    rainstorm from the next. Note that here it is applied to flood timing
+    across the whole network, not to a rainfall record, so episodes are
+    inferred from flooding rather than confirmed rain events.
+
+    Args:
+        df: One row per flood event, already filtered to the sensors to group
+            (non-tidal, normally). Pandas accepted.
+        gap_hours: Dry period, in hours, that separates two episodes.
+        depth_threshold_inches: Depth a sensor must reach to count as flooded.
+        severe_threshold_inches: Depth for severe flooding.
+        start_col: Event start; the sort key.
+        end_col: Event end.
+        max_col: Event peak depth.
+
+    Returns:
+        (events, sensor_episodes, episodes):
+        - events: the input sorted by start time, plus `latest_end_so_far`
+          and `episode_id`.
+        - sensor_episodes: one row per sensor per episode, with its earliest
+          `start_time`, deepest `max_depth_inches`, `month_start`, and the
+          `reached_4in` / `reached_12in` flags (named for the defaults).
+        - episodes: one row per episode, with `episode_start`, `episode_end`,
+          `sensors_4in`, `sensors_12in`, `start_date`, `end_date`, and
+          `duration_hours`.
+
+    Note:
+        `episode_id` is a running count over the sorted record, so a data
+        refresh renumbers it. Select episodes by date, not by id.
+    """
+    if not isinstance(df, pl.DataFrame):
+        df = pl.from_pandas(df)
+
+    events = (
+        df.sort(start_col)
+        # latest end time of any earlier event
+        .with_columns(pl.col(end_col).cum_max().shift(1).alias("latest_end_so_far"))
+        # start a new episode after a gap longer than gap_hours
+        .with_columns(
+            (
+                (pl.col(start_col) - pl.col("latest_end_so_far"))
+                > pl.duration(hours=gap_hours)
+            )
+            .fill_null(True)
+            .cum_sum()
+            .alias("episode_id")
+        )
+    )
+
+    # one row per sensor per episode, keeping its deepest reading
+    sensor_episodes = (
+        events.group_by("episode_id", "sensor_id")
+        .agg(
+            pl.col(start_col).min().alias("start_time"),
+            pl.col(max_col).max().alias("max_depth_inches"),
+        )
+        .with_columns(
+            pl.col("start_time").dt.truncate("1mo").dt.date().alias("month_start"),
+            (pl.col("max_depth_inches") >= depth_threshold_inches).alias("reached_4in"),
+            (pl.col("max_depth_inches") >= severe_threshold_inches).alias("reached_12in"),
+        )
+    )
+
+    # one row per episode
+    episodes = (
+        events.group_by("episode_id")
+        .agg(
+            pl.col(start_col).min().alias("episode_start"),
+            pl.col(end_col).max().alias("episode_end"),
+        )
+        .join(
+            sensor_episodes.group_by("episode_id").agg(
+                pl.col("reached_4in").sum().alias("sensors_4in"),
+                pl.col("reached_12in").sum().alias("sensors_12in"),
+            ),
+            on="episode_id",
+        )
+        .with_columns(
+            pl.col("episode_start").dt.date().alias("start_date"),
+            pl.col("episode_end").dt.date().alias("end_date"),
+            ((pl.col("episode_end") - pl.col("episode_start")).dt.total_minutes() / 60)
+            .round(1)
+            .alias("duration_hours"),
+        )
+        .sort("episode_id")
+    )
+
+    return events, sensor_episodes, episodes
 
 
 # ===========================================================================
