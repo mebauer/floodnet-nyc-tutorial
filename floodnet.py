@@ -7,7 +7,7 @@ into its own module:
     Constants   ->  constants.py   (COLORBLIND_PALETTE)
     Data I/O    ->  data.py        (download_*, dataset_*)
     Analysis    ->  analysis.py    (time_to_threshold, storm_events,
-                                    build_rain_episodes)
+                                    build_rain_episodes, days_deployed)
     Plotting    ->  plotting.py    (plot_*)
 
 Note: ``plot_ranked_sensors`` operates on geopandas ``GeoDataFrame`` objects
@@ -869,6 +869,51 @@ def build_rain_episodes(
     )
 
     return events, sensor_episodes, episodes
+
+
+def days_deployed(
+    metadata_df,
+    data_cutoff,
+    installed_col: str = "date_installed",
+    removed_col: str = "date_removed",
+):
+    """Days each sensor was deployed, the exposure behind per-sensor rates.
+
+    Deployment runs from installation to removal or `data_cutoff`, whichever
+    comes first. Ending at the data cutoff rather than today keeps a rate from
+    drifting each time the notebook is re-run, and ending at removal keeps a
+    removed sensor from accruing time it wasn't watching.
+
+    The metadata has no uptime record, so this assumes each sensor worked
+    continuously while installed -- an upper bound on time actually watched.
+
+    Args:
+        metadata_df: One row per sensor. Pandas accepted.
+        data_cutoff: Date the record runs through, e.g. the end of the latest
+            event in the dataset.
+        installed_col: Install date or datetime.
+        removed_col: Removal date or datetime; null while still deployed.
+
+    Returns:
+        `sensor_id` and `days_deployed`. Sensors installed after the cutoff
+        get zero or negative days; filter on a minimum before computing rates.
+    """
+    if not isinstance(metadata_df, pl.DataFrame):
+        metadata_df = pl.from_pandas(metadata_df)
+
+    cutoff = pl.lit(data_cutoff).cast(pl.Date)
+
+    return metadata_df.select(
+        "sensor_id",
+        (
+            pl.min_horizontal(
+                pl.col(removed_col).cast(pl.Date).fill_null(cutoff), cutoff
+            )
+            - pl.col(installed_col).cast(pl.Date)
+        )
+        .dt.total_days()
+        .alias("days_deployed"),
+    )
 
 
 # ===========================================================================
