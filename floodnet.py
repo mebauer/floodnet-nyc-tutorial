@@ -228,18 +228,11 @@ def dataset_manifest(
             if ts else None
         )
 
-    # Views API
+    # Views API, the same source dataset_info prints from
     views = requests.get(f"{base_url}/api/views/{dataset_id}.json").json()
 
-    # Catalog API
-    catalog = requests.get(
-        f"{base_url}/api/catalog/v1",
-        params={"ids": dataset_id}
-    ).json()
-
-    catalog_result = catalog.get("results", [{}])[0]
-    classification = catalog_result.get("classification", {})
-    metadata = catalog_result.get("metadata", {})
+    # Agency-set fields (e.g. update frequency), grouped by section
+    custom_fields = views.get("metadata", {}).get("custom_fields", {})
 
     # Newest row-creation timestamp upstream; watermark for "added since".
     watermark = latest_created_at(dataset_id, base_url=base_url)
@@ -257,9 +250,13 @@ def dataset_manifest(
         "comment_count": views.get("numberOfComments"),
         "average_rating": views.get("averageRating"),
 
-        "category": classification.get("domain_category"),
-        "tags": classification.get("tags") or ["unclassified"],
-        "update_frequency": metadata.get("update_frequency") or "unknown",
+        "category": views.get("category"),
+        # Sorted so the manifest only changes when the tags do; the API
+        # does not promise an order.
+        "tags": sorted(views.get("tags") or ["unclassified"]),
+        "update_frequency": (
+            custom_fields.get("Update", {}).get("Update Frequency") or "unknown"
+        ),
 
         "row_count": row_count,
         "column_count": column_count,
