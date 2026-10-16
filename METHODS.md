@@ -33,12 +33,15 @@ These tutorials aim to teach good practice, not to show off technique.
 | Event | A run of depth readings > 10 mm, verified as a flood by FloodNet QC | FloodNet's definition; one row in the Flood Events dataset | dataset |
 | Flood | Event with peak depth ≥ 4 in at the sensor | NYC Stormwater Flood Maps "nuisance" tier (4 in to < 1 ft); matches `duration_above_4_inches_mins` | notebooks 02, 05–07 |
 | Major flood | Event with peak depth ≥ 12 in at the sensor | Flood Maps "deep and contiguous" tier (≥ 1 ft); matches `duration_above_12_inches_mins` | notebooks 05–07 |
-| Rain episode | Non-tidal events grouped across the whole network: a new episode starts when an event begins more than 6 h after the latest end time of all earlier events | The 6 h minimum interevent time used to separate rainstorms (e.g. Driscoll et al. 1989), adapted to flood timing. See caveat 4 | `floodnet.build_rain_episodes`; tested in notebook 06 |
+| Rain episode | **Exploratory grouping, not a definition of an event.** Non-tidal events grouped across the whole network: a new episode starts when an event begins more than 6 h after the latest end time of all earlier events | The 6 h default borrows the minimum interevent time used to separate rainstorms (e.g. Driscoll et al. 1989), adapted to flood timing. Results are worth checking at other gaps. See caveat 4 | `floodnet.build_rain_episodes`; notebook 06 checks episode counts across gaps |
 | Deployment (exposure) | Days from install to removal or to the data cutoff, whichever comes first | Sensor metadata; assumes continuous operation (caveat 6) | `floodnet.days_deployed` |
 | Data cutoff | End of the latest event in the dataset, not the download date | Keeps rates stable across re-runs. See caveat 8 | notebook 02 |
 | Active sensor-month | Sensor installed on or before the month's last day and not removed before its first | Sensor metadata | notebook 05 |
 | Minimum record | Only sensors deployed ≥ 180 days are ranked by rate | **Judgment call:** keeps one early flood from producing an extreme rate. Not hydrological; doesn't guarantee a full seasonal cycle | notebook 02 |
 | Storm plot floor | `storm_events` / `plot_storm_events` drop events with peak ≤ 2 in | **No grounded basis yet;** a display filter only | `floodnet.storm_events` |
+
+Flood and major flood are nested, not exclusive: every major flood is also a
+flood. For mutually exclusive bins, use < 4 in, 4 to < 12 in, and ≥ 12 in.
 
 ## FloodNet data caveats
 
@@ -78,8 +81,10 @@ These tutorials aim to teach good practice, not to show off technique.
    records. Conclusions stay at the surface hydrology the sensors observe:
    don't attribute floods to sewer capacity or storm intensity.
    `drain_time_mins` is recession at the sensor, not sewer performance. Rain
-   episodes are inferred from flood timing, not confirmed rain events, and the
-   6 h rule is applied differently from its origin:
+   episodes are an exploratory way to group events, inferred from flood timing,
+   not confirmed rain events. The event itself is FloodNet's definition; the
+   episode is ours, and a different gap would give different episodes. The
+   6 h rule is also applied differently from its origin:
    - In rainfall analysis it is a dry gap in one gauge's record. Here it is a
      gap between flood events anywhere in the non-tidal network. A gap between
      floods is not a dry period: it is shortened by the time water takes to
@@ -133,6 +138,22 @@ These tutorials aim to teach good practice, not to show off technique.
     floods (≥ 4 in) depends on the question, so decide deliberately and state
     which definition a count uses. `duration_above_24_inches_mins` also exists
     but is not used as a tier.
+
+### Mapping flood extent
+11. **A sensor measures a point, not an area.** Turning sensor depths into a
+    flood extent, whether by projecting a sensor's water level across a DEM
+    ("bathtub" mapping) or by interpolating depths between sensors, probably
+    isn't best practice for street flooding. For rain-driven flooding the water
+    surface is rarely level beyond the local low spot: water pools in separate
+    dips and flows along streets, and curbs, buildings and storm drains shape
+    where it goes, none of which a single reading captures. DEM vertical error
+    can be similar in size to the depths involved, the depth at the sensor
+    understates the low point (caveat 1), and sensors peak at different times.
+    Modeled products such as the NYC Stormwater Flood Maps are a better starting
+    point for extent, with sensor depths as point checks against them. For tidal
+    flooding, a level water surface limited to land connected to the shoreline
+    is a common first approximation. Any mapped extent is an estimate, not an
+    observation, and is worth labeling that way.
 
 ## Time zones
 Flood start and end times are published in UTC (the data dictionary labels them
