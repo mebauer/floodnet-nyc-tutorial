@@ -12,11 +12,13 @@ drawing conclusions from the data.
 ## Approach
 These tutorials aim to teach good practice, not to show off technique.
 - **The method can come from anywhere; the parameters cannot.** A purely
-  statistical method is fine, but it must not contradict how flooding
-  physically works or what these sensors can observe. Every threshold, grouping
-  rule or derived metric is a hydrological claim, so each one traces back to an
-  established convention or a physical fact about the sensors, and the notebook
-  says which. When a parameter has no such basis, the notebook says so
+  statistical method is fine, but its assumptions, and how its results are
+  read, must fit how flooding physically works and what these sensors can
+  observe. Every threshold, grouping rule or derived metric is a hydrological
+  claim, so each one traces back to an established convention or a physical
+  fact about the sensors, and the notebook says which. Display choices, such as
+  how many sensors a chart shows, aren't parameters in this sense. When a
+  parameter has no such basis, the notebook says so
   plainly. A threshold isn't kept just because it is clever or because the
   results look good.
 - **Judgment calls are named as such.** Where no convention exists, the
