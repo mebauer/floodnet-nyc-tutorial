@@ -698,7 +698,7 @@ def _select_storm_events(
         df.filter(
             (pl.col(end_col) >= window_start)
             & (pl.col(start_col) <= window_end)
-            & (pl.col(max_col) > min_depth_inches)
+            & (pl.col(max_col) >= min_depth_inches)
             & pl.col(ts_sec_col).is_not_null()
             & pl.col(ts_in_col).is_not_null()
         )
@@ -718,7 +718,7 @@ def storm_events(
     max_col: str = "max_depth_inches",
     ts_sec_col: str = "flood_profile_time_secs",
     ts_in_col: str = "flood_profile_depth_inches",
-    min_depth_inches: float = 2.0,
+    min_depth_inches: float = 0.0,
 ):
     """Table the curves `plot_storm_events` draws, one row per flood event.
 
@@ -731,12 +731,12 @@ def storm_events(
     for.
 
     Each row therefore carries the window it was selected by, so a count is
-    reproducible from the table alone. Counting flooded sensors means counting
+    reproducible from the table alone. Counting sensors means counting
     distinct sensors, not rows -- one sensor can log several events in a storm
     when its depth dips back under the flood threshold and rises again:
 
         table.group_by("storm_name").agg(
-            pl.col("sensor_id").n_unique().alias("sensors_flooded")
+            pl.col("sensor_id").n_unique().alias("sensors_with_events")
         )
 
     Args:
@@ -747,10 +747,12 @@ def storm_events(
         storm_name: Label stamped on every returned row; the grouping key.
         start_col: Event start; also the sort key.
         end_col: Event end; used for window overlap.
-        max_col: Event peak; events at or below `min_depth_inches` are dropped.
+        max_col: Event peak; events below `min_depth_inches` are dropped.
         ts_sec_col: List column of elapsed seconds; rows missing it are dropped.
         ts_in_col: List column of depths; rows missing it are dropped.
-        min_depth_inches: Exclusive floor on peak depth.
+        min_depth_inches: Inclusive floor on peak depth. The default of 0
+            keeps every event; pass 4 to keep only floods (the repo's flood
+            definition, see METHODS.md) or any other floor you can justify.
 
     Returns:
         Matched events with `storm_name`, `window_start`, `window_end`, and
@@ -1249,7 +1251,7 @@ def plot_storm_events(
     sensor_col: str = "sensor_name",
     ts_sec_col: str = "flood_profile_time_secs",
     ts_in_col: str = "flood_profile_depth_inches",
-    min_depth_inches: float = 2.0,
+    min_depth_inches: float = 0.0,
 ):
     """Overlay every sensor's flood profile for one storm on a shared clock.
 
@@ -1265,11 +1267,13 @@ def plot_storm_events(
         legend_out: Place the legend outside the axes for crowded plots.
         start_col: Event start; also the anchor for each profile's timestamps.
         end_col: Event end; used for window overlap and x-limits.
-        max_col: Event peak; events at or below `min_depth_inches` are dropped.
+        max_col: Event peak; events below `min_depth_inches` are dropped.
         sensor_col: Grouping key for color and legend entries.
         ts_sec_col: List column of elapsed seconds, parallel to `ts_in_col`.
         ts_in_col: List column of depths.
-        min_depth_inches: Exclusive floor on peak depth.
+        min_depth_inches: Inclusive floor on peak depth. The default of 0
+            keeps every event; pass 4 to keep only floods (the repo's flood
+            definition, see METHODS.md) or any other floor you can justify.
 
     Returns:
         (Figure, Axes), undisplayed.

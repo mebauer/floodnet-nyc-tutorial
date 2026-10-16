@@ -38,7 +38,7 @@ These tutorials aim to teach good practice, not to show off technique.
 | Data cutoff | End of the latest event in the dataset, not the download date | Keeps rates stable across re-runs. See caveat 8 | notebook 02 |
 | Active sensor-month | Sensor installed on or before the month's last day and not removed before its first | Sensor metadata | notebook 05 |
 | Minimum record | Only sensors deployed ≥ 180 days are ranked by rate | **Judgment call:** keeps one early flood from producing an extreme rate. Not hydrological; doesn't guarantee a full seasonal cycle | notebook 02 |
-| Storm plot floor | `storm_events` / `plot_storm_events` drop events with peak ≤ 2 in | **No grounded basis yet;** a display filter only | `floodnet.storm_events` |
+| Storm plot floor | `storm_events` / `plot_storm_events` keep events with peak ≥ `min_depth_inches`; the default of 0 keeps every event | No filter by default. Pass 4 to show floods only, or another floor with a stated basis | `floodnet.storm_events`; notebook 03 |
 
 Flood and major flood are nested, not exclusive: every major flood is also a
 flood. For mutually exclusive bins, use < 4 in, 4 to < 12 in, and ≥ 12 in.
