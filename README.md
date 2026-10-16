@@ -47,6 +47,8 @@ The ultimate goal of this project is to promote these datasets for anyone intere
 
 - Sensor Deployment Metadata. Retrieved from https://data.cityofnewyork.us/Environment/FloodNet-Sensor-Deployment-Metadata/kb2e-tjy3/about_data
 
+**Time zones.** Flood start and end times are published in UTC (the data dictionary labels them GMT), with no offset in the values. The notebooks keep these UTC columns and add New York local-time copies with an `_et` suffix (`America/New_York`, which handles daylight saving) using `floodnet.to_local_time()`. Anything read off a calendar or clock (hour of day, date, month, year) uses the `_et` columns, and times shown in tables and plots are labeled ET. Durations are the same in either zone. Sensor install and removal dates are calendar dates and are not converted.
+
 # 4. FloodNet Resources
 
 Start here to understand the FloodNet sensor network, datasets, methodology, quality control, and applications of hyperlocal street-flood measurements in New York City.

@@ -4,10 +4,11 @@ This module is organized into sections that map cleanly onto a future package
 split, so breaking it apart later is mostly a matter of moving each section
 into its own module:
 
-    Constants   ->  constants.py   (COLORBLIND_PALETTE)
+    Constants   ->  constants.py   (COLORBLIND_PALETTE, NYC_TZ)
     Data I/O    ->  data.py        (download_*, dataset_*)
-    Analysis    ->  analysis.py    (time_to_threshold, storm_events,
-                                    build_rain_episodes, days_deployed)
+    Analysis    ->  analysis.py    (to_local_time, time_to_threshold,
+                                    storm_events, build_rain_episodes,
+                                    days_deployed)
     Plotting    ->  plotting.py    (plot_*)
 
 Note: ``plot_ranked_sensors`` operates on geopandas ``GeoDataFrame`` objects
@@ -20,7 +21,7 @@ import ast
 import io
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # Third-party libraries
@@ -46,6 +47,10 @@ COLORBLIND_PALETTE = [
     "#BBBBBB",  # grey
     "#EE9944",  # orange
 ]
+
+# Local time zone for analysis and display. Handles the EST/EDT switch, so
+# label it "ET", never "EST".
+NYC_TZ = "America/New_York"
 
 
 # ===========================================================================
@@ -151,8 +156,11 @@ def dataset_info(
     """
 
     def parse_timestamp(ts):
-        """Convert a Unix timestamp to a human-readable date string."""
-        return datetime.fromtimestamp(ts).strftime("%B %d, %Y") if ts else "N/A"
+        """Convert a Unix timestamp to a human-readable UTC date string."""
+        return (
+            datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%B %d, %Y UTC")
+            if ts else "N/A"
+        )
 
     # fetch dataset metadata from the Socrata API
     metadata = requests.get(f"{base_url}/api/views/{dataset_id}.json").json()
@@ -218,13 +226,16 @@ def dataset_manifest(
     base_url="https://data.cityofnewyork.us",
     manifest_path="data/manifest.json"
 ):
-    """Create/update a manifest file with dataset metadata."""
+    """Create/update a manifest file with dataset metadata.
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    Dates are UTC calendar dates, so the manifest reads the same on any machine.
+    """
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     def parse_ts(ts):
         return (
-            datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+            datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
             if ts else None
         )
 
@@ -419,6 +430,39 @@ def download_new_records(
 # ===========================================================================
 # Analysis
 # ===========================================================================
+
+def to_local_time(df, cols=("flood_start_time", "flood_end_time")):
+    """Add New York local-time copies of UTC timestamp columns.
+
+    The data dictionary labels the flood start/end times as GMT, but the CSV
+    values carry no offset, so they load as naive datetimes. Each column is
+    marked as UTC in place and a `<col>_et` copy is added in `NYC_TZ`. Use the
+    `_et` columns for anything read off a calendar or clock (hour, date,
+    month, year); durations come out the same in either.
+
+    Args:
+        df: Frame with the timestamp columns. Pandas accepted.
+        cols: Columns to convert. Naive values are read as UTC; columns that
+            already carry a time zone are only converted, so calling this
+            twice is safe.
+
+    Returns:
+        Polars DataFrame with each column UTC-aware and a `<col>_et` added.
+    """
+    if not isinstance(df, pl.DataFrame):
+        df = pl.from_pandas(df)
+
+    utc = [
+        pl.col(c).dt.replace_time_zone("UTC")
+        if df.schema[c].time_zone is None
+        else pl.col(c).dt.convert_time_zone("UTC")
+        for c in cols
+    ]
+
+    return df.with_columns(utc).with_columns(
+        pl.col(c).dt.convert_time_zone(NYC_TZ).alias(f"{c}_et") for c in cols
+    )
+
 
 def time_to_threshold(
     df,
@@ -917,6 +961,17 @@ def days_deployed(
 # Plotting
 # ===========================================================================
 
+def _tz_label(tz) -> str:
+    """Axis-label name for a column's time zone.
+
+    Naive columns are labelled UTC, the source convention (see
+    `to_local_time`).
+    """
+    if tz is None:
+        return "UTC"
+    return "ET" if tz == NYC_TZ else tz
+
+
 def plot_threshold_crossings(
     profiles,
     time_col: str = "time_to_thresh_sec",
@@ -1114,7 +1169,7 @@ def plot_flood_event(
 
     title_start = start_time.strftime("%m/%d/%y %H:%M")
     ax.set_title(f"Sensor: {sensor_name}\nFlood Start: {title_start}")
-    ax.set_xlabel("Date/Time")
+    ax.set_xlabel(f"Date/Time ({_tz_label(df.schema[start_col].time_zone)})")
     ax.set_ylabel("Flood Depth (inches)")
     ax.grid(True)
     fig.tight_layout()
@@ -1338,7 +1393,10 @@ def plot_storm_events(
             fontsize=12,
             fontweight="bold",
         )
-        ax.set_xlabel("Date / Time", fontsize=10)
+        ax.set_xlabel(
+            f"Date / Time ({_tz_label(events.schema[start_col].time_zone)})",
+            fontsize=10,
+        )
         ax.set_ylabel("Flood Depth (inches)", fontsize=10)
 
         if legend_out:
