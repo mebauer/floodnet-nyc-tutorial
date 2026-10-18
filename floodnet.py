@@ -1089,6 +1089,7 @@ def plot_flood_event(
     start_col: str = "flood_start_time_et",
     ts_sec_col: str = "flood_profile_time_secs",
     ts_in_col: str = "flood_profile_depth_inches",
+    ax=None,
 ):
     """Plot one flood event's depth profile against wall-clock time.
 
@@ -1102,18 +1103,26 @@ def plot_flood_event(
         start_col: Event start timestamp; anchors the x-axis.
         ts_sec_col: List column of elapsed seconds. JSON strings decoded.
         ts_in_col: List column of depths, parallel to `ts_sec_col`.
+        ax: Axes to draw on, e.g. one panel of a grid; layout is then the
+            caller's job. None creates a new figure.
 
     Returns:
         (Figure, Axes), undisplayed.
 
     Raises:
-        ValueError: Empty frame, missing/empty/mismatched profile arrays, or
-            a null start time.
+        ValueError: Empty frame, missing columns, missing/empty/mismatched
+            profile arrays, or a null start time.
     """
     if not isinstance(df, pl.DataFrame):
         df = pl.from_pandas(df)
     if df.is_empty():
         raise ValueError("df is empty.")
+    missing = {start_col, ts_sec_col, ts_in_col} - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"df is missing columns {sorted(missing)}; "
+            "select them or join them back from the full events frame."
+        )
 
     # Decode if the profiles survived a CSV round-trip as JSON strings.
     schema = df.schema
@@ -1164,17 +1173,23 @@ def plot_flood_event(
     timestamps = ts["timestamp"].to_list()
     depths = ts["depth_in"].to_list()
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+    own_fig = ax is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=(6, 4))
+    else:
+        fig = ax.figure
     ax.plot(timestamps, depths, marker="o", linestyle="-")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d/%y %H:%M", tz=start_time.tzinfo))
-    fig.autofmt_xdate(rotation=30, ha="right")
+    # Per-axes, not fig.autofmt_xdate: that hides x labels off the bottom row of a grid
+    plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
 
     title_start = start_time.strftime("%m/%d/%y %H:%M")
     ax.set_title(f"Sensor: {sensor_name}\nFlood Start: {title_start}")
     ax.set_xlabel(f"Date/Time ({_tz_label(df.schema[start_col].time_zone)})")
     ax.set_ylabel("Flood Depth (inches)")
     ax.grid(True)
-    fig.tight_layout()
+    if own_fig:
+        fig.tight_layout()
 
     return fig, ax
 
