@@ -1254,6 +1254,77 @@ def plot_sensor_profiles(df, sensor_id=None, alpha=None):
     return fig, ax
 
 
+def plot_ranked_profiles(ranked_df, events_df, rank_col="rank", ncols=2):
+    """Grid of depth profiles for ranked events, one panel per event.
+
+    Rows of `ranked_df` are matched back to `events_df` by sensor and start
+    time, so a ranking table needs only its rank and key columns, not the
+    profile arrays.
+
+    Args:
+        ranked_df: Ranked events with `rank_col`, `sensor_id` and
+            `flood_start_time_et`. Subset it (e.g. `.head(5)`) to plot fewer.
+            Pandas accepted.
+        events_df: Full events frame with profiles and `tidally_influenced`.
+        rank_col: Rank column, shown in each panel title and used for order.
+        ncols: Panels per row; rows grow with the event count.
+
+    Returns:
+        (Figure, ndarray of Axes), undisplayed and untitled.
+
+    Raises:
+        ValueError: Empty `ranked_df`, or a ranked row matching no event or
+            more than one.
+    """
+    if not isinstance(ranked_df, pl.DataFrame):
+        ranked_df = pl.from_pandas(ranked_df)
+    if not isinstance(events_df, pl.DataFrame):
+        events_df = pl.from_pandas(events_df)
+    if ranked_df.is_empty():
+        raise ValueError("ranked_df is empty; nothing to plot.")
+
+    # No event ID in the dataset; sensor + start time identifies an event
+    event_key = ["sensor_id", "flood_start_time_et"]
+    events = (
+        ranked_df.select([rank_col, *event_key])
+        .join(events_df, on=event_key, how="left")
+        .sort(rank_col)
+    )
+    # Fail loudly: a missed match would break mid-grid, a double match would
+    # silently duplicate panels
+    if (
+        events.height != ranked_df.height
+        or events.select(event_key).is_duplicated().any()
+        or events["flood_profile_time_secs"].null_count() > 0
+    ):
+        raise ValueError(
+            "Ranked rows don't match events one to one on "
+            f"{event_key}; check the ranking query's key columns."
+        )
+
+    nrows = -(-events.height // ncols)  # ceiling division
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(10, 3.2 * nrows),
+        sharey=True, squeeze=False, layout="constrained",
+    )
+    for ax, event in zip(axes.flat, events.iter_slices(1)):
+        plot_flood_event(event, ax=ax)
+        # Tidal vs non-tidal are different regimes (METHODS caveat 3); the
+        # metadata flag is "Yes"/"No", and null when an event lacks metadata
+        regime = {"Yes": "tidal", "No": "non-tidal"}.get(
+            event["tidally_influenced"][0], "tidal flag unknown"
+        )
+        ax.set_title(
+            f"#{event[rank_col][0]} · {regime} · {ax.get_title()}", fontsize=10
+        )
+
+    # Drop panels left over when the count doesn't fill the last row
+    for ax in axes.flat[events.height:]:
+        ax.remove()
+
+    return fig, axes
+
+
 def plot_storm_events(
     df,
     date_storm,
