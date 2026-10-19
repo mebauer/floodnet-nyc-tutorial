@@ -66,7 +66,11 @@ flood. For mutually exclusive bins, use < 4 in, 4 to < 12 in, and ≥ 12 in.
    can inflate `max_depth_inches` and distort `onset_time_mins` and
    `drain_time_mins`. Snow piled under a sensor can produce false readings or
    hide a flood shallower than the pile. Rankings by maximum depth and winter
-   results deserve the most scrutiny. Before November 2021 some sensors
+   results deserve the most scrutiny. An unusually long event at a non-tidal
+   sensor can be spurious (an object or snow pile left under the sensor can
+   hold readings above 10 mm for hours or days) or real (water ponding where
+   it can't drain); check the depth profile before reading it either way.
+   Before November 2021 some sensors
    sampled every 5 minutes instead of every minute, so early onset and drain
    times are coarser.
 
@@ -79,6 +83,16 @@ flood. For mutually exclusive bins, use < 4 in, 4 to < 12 in, and ≥ 12 in.
    any pooled count. The flag is per sensor, not per event: a tidal sensor can
    still record rain-driven floods. Rain-based rules such as the episode
    grouping apply to non-tidal sensors only.
+   - An event at a tidal sensor can span several high tides. FloodNet's
+     events can include stretches where depth drops to 10 mm or below, so
+     successive tides can join into one event even if the water drains
+     between them. That event counts once, its `duration_mins` includes the
+     low-tide troughs, and it outranks single-tide events in any per-event
+     duration ranking or average. `duration_above_4_inches_mins` excludes
+     time below 4 in but still adds up every tide. Per-event results at tidal
+     sensors therefore partly measure how many tides merged, though many long
+     tidal events show one sustained peak instead; check the depth profile
+     before reading a long tidal event as one long flood.
 4. **Surface observations only.** These data contain no rainfall or drainage
    records. Conclusions stay at the surface hydrology the sensors observe:
    don't attribute floods to sewer capacity or storm intensity.
