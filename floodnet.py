@@ -1254,7 +1254,10 @@ def plot_sensor_profiles(df, sensor_id=None, alpha=None):
     return fig, ax
 
 
-def plot_ranked_profiles(ranked_df, events_df, rank_col="rank", ncols=2):
+def plot_ranked_profiles(
+    ranked_df, events_df, rank_col="rank", ncols=2,
+    threshold_inches=None, crossing_col=None,
+):
     """Grid of depth profiles for ranked events, one panel per event.
 
     Rows of `ranked_df` are matched back to `events_df` by sensor and start
@@ -1268,6 +1271,12 @@ def plot_ranked_profiles(ranked_df, events_df, rank_col="rank", ncols=2):
         events_df: Full events frame with profiles and `tidally_influenced`.
         rank_col: Rank column, shown in each panel title and used for order.
         ncols: Panels per row; rows grow with the event count.
+        threshold_inches: Depth marked with a dashed line on every panel,
+            e.g. the threshold a ranking timed. None draws no line.
+        crossing_col: Column of `ranked_df` holding seconds from the event's
+            first reading to the threshold crossing (`time_to_thresh_sec`
+            from `time_to_threshold`), marked with a dotted line. None draws
+            no line.
 
     Returns:
         (Figure, ndarray of Axes), undisplayed and untitled.
@@ -1286,7 +1295,7 @@ def plot_ranked_profiles(ranked_df, events_df, rank_col="rank", ncols=2):
     # No event ID in the dataset; sensor + start time identifies an event
     event_key = ["sensor_id", "flood_start_time_et"]
     events = (
-        ranked_df.select([rank_col, *event_key])
+        ranked_df.select([rank_col, *event_key, *([crossing_col] if crossing_col else [])])
         .join(events_df, on=event_key, how="left")
         .sort(rank_col)
     )
@@ -1309,6 +1318,16 @@ def plot_ranked_profiles(ranked_df, events_df, rank_col="rank", ncols=2):
     )
     for ax, event in zip(axes.flat, events.iter_slices(1)):
         plot_flood_event(event, ax=ax)
+        if threshold_inches is not None:
+            ax.axhline(threshold_inches, color="grey", linestyle="--", linewidth=1)
+        if crossing_col is not None:
+            # Both time_to_threshold and plot_flood_event measure from the
+            # event's first reading, so start + offset lands on the curve
+            ax.axvline(
+                event["flood_start_time_et"][0]
+                + timedelta(seconds=event[crossing_col][0]),
+                color="grey", linestyle=":", linewidth=1,
+            )
         # Tidal vs non-tidal are different regimes (METHODS caveat 3); the
         # metadata flag is "Yes"/"No", and null when an event lacks metadata
         regime = {"Yes": "tidal", "No": "non-tidal"}.get(
