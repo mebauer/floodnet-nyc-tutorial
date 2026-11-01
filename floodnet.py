@@ -427,6 +427,38 @@ def download_new_records(
     )
 
 
+def warn_if_republished(new_rows, dataset_record):
+    """Print a warning when a refresh re-stamped every row in a dataset.
+
+    ``download_new_records`` treats a newer ``:created_at`` as a new row. When
+    the publisher reloads the whole dataset, every row gets a new stamp, so
+    "new" rows are really just the existing table. Only a full reload is
+    detected: a partial one looks like an ordinary refresh, and a full reload
+    that also adds real rows can't be told apart from one that doesn't.
+
+    Args:
+        new_rows: Number of rows ``download_new_records`` returned.
+        dataset_record: This dataset's entry from ``data/manifest.json``.
+
+    Returns:
+        True if every row was re-stamped, otherwise False.
+    """
+    is_republish = (
+        dataset_record.get("previous_created_at") is not None
+        and new_rows == dataset_record.get("row_count")
+    )
+
+    if is_republish:
+        print(
+            f"\nWARNING: all {new_rows:,} rows have a new :created_at, so this "
+            "looks like a full republish, not new data.\n"
+            "Don't read the 'new' events below as added in this refresh. Any "
+            "real additions can't be separated from the reload."
+        )
+
+    return is_republish
+
+
 # ===========================================================================
 # Analysis
 # ===========================================================================
