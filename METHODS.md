@@ -38,6 +38,8 @@ These tutorials aim to teach good practice, not to show off technique.
 | Rain episode | **Exploratory grouping, not a definition of an event.** Non-tidal events grouped across the whole network: a new episode starts when an event begins more than 6 h after the latest end time of all earlier events | The 6 h default borrows the minimum interevent time used to separate rainstorms (e.g. Driscoll et al. 1989), adapted to flood timing. Results are worth checking at other gaps. See caveat 4 | `floodnet.build_rain_episodes`; notebook 06 checks episode counts across gaps |
 | Deployment (exposure) | Days from install to removal or to the data cutoff, whichever comes first | Sensor metadata; assumes continuous operation (caveat 6) | `floodnet.days_deployed` |
 | Data cutoff | End of the latest event in the dataset, not the download date | Keeps rates stable across re-runs. See caveat 8 | notebook 02 |
+| New event | An event not in `data/event-log.csv` when a download is compared with it, matched on `sensor_id` + `flood_start_time`. The latest batch is the events with the newest `first_seen`. `first_seen` is when this repo first saw the event, not a publish date; events from before the first logged download share that download's date | Row-load timestamps can't be used: a full reload re-stamps every row. A skipped refresh merges two publishes into one batch, and a removed event that returns counts as new | `floodnet.update_event_log`; notebooks 00, 02, 04 |
+| Started before the previous cutoff | Latest-batch event whose start is earlier than the latest end time among events first seen before that batch | Same idea as the data cutoff, applied to the previous batch. Marks events that reached us late; publication has no sharp line, so it isn't a QC measure | `floodnet.previous_cutoff`; notebook 04 |
 | Active sensor-month | Sensor installed on or before the month's last day and not removed before its first | Sensor metadata | notebook 05 |
 | Minimum record | Only sensors deployed ≥ 180 days are ranked by rate | **Judgment call:** keeps one early flood from producing an extreme rate. Not hydrological; doesn't guarantee a full seasonal cycle | notebook 02 |
 | Minimum floods | Only sensors with ≥ 3 qualifying events (floods for the 4 in average, major floods for the 12 in average) are ranked by average time above a depth | **Judgment call:** keeps one or two events from standing in for an average. Not hydrological; the notebook prints how much each top 10 changes at a minimum of 2 or 5 | notebook 02 section 5 |
@@ -139,7 +141,8 @@ flood. For mutually exclusive bins, use < 4 in, 4 to < 12 in, and ≥ 12 in.
    thin relative to the rest.
 8. **Recent weeks are incomplete.** Events are published only after QC, and
    each biweekly refresh adds older events that only just cleared review
-   (notebook 04 calls them late arrivals). The record runs only to the data
+   (notebook 04 counts the new events that started before the previous
+   cutoff, calling them late arrivals). The record runs only to the data
    cutoff, and the weeks just before it are likely undercounted. Don't read a
    drop in the latest weeks as a drop in flooding.
 9. **A sensor is not a site.** When a sensor is replaced at the same location

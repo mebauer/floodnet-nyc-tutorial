@@ -4,8 +4,9 @@ This module is organized into sections that map cleanly onto a future package
 split, so breaking it apart later is mostly a matter of moving each section
 into its own module:
 
-    Constants   ->  constants.py   (COLORBLIND_PALETTE, NYC_TZ)
-    Data I/O    ->  data.py        (download_*, dataset_*)
+    Constants   ->  constants.py   (COLORBLIND_PALETTE, NYC_TZ, EVENT_KEY)
+    Data I/O    ->  data.py        (download_*, dataset_*, update_event_log,
+                                    latest_new_events, previous_cutoff)
     Analysis    ->  analysis.py    (to_local_time, time_to_threshold,
                                     storm_events, build_rain_episodes,
                                     days_deployed)
@@ -51,6 +52,9 @@ COLORBLIND_PALETTE = [
 # Local time zone for analysis and display. Handles the EST/EDT switch, so
 # label it "ET", never "EST".
 NYC_TZ = "America/New_York"
+
+# Flood events have no ID column; these columns together identify an event.
+EVENT_KEY = ["sensor_id", "flood_start_time"]
 
 
 # ===========================================================================
@@ -457,6 +461,151 @@ def warn_if_republished(new_rows, dataset_record):
         )
 
     return is_republish
+
+
+def _read_events_and_log(events_path, log_path):
+    """Read the flood events CSV and the event log, which must already exist."""
+    if not Path(log_path).exists():
+        raise FileNotFoundError(
+            f"No event log at {log_path}. Restore it rather than starting a new "
+            "one: an empty log would make every event look new."
+        )
+
+    events = pl.read_csv(
+        events_path,
+        # some columns have sparse data, need to expand the row count
+        infer_schema_length=100_000,
+        try_parse_dates=True,
+    )
+    log = pl.read_csv(log_path, try_parse_dates=True)
+
+    return events, log
+
+
+def update_event_log(
+    events_path="data/flood-events.csv",
+    log_path="data/event-log.csv",
+    allow_missing=False
+):
+    """Add events we haven't seen before to the event log.
+
+    An event is identified by ``EVENT_KEY``. ``first_seen`` is the UTC date of
+    the download that first contained it, so rerunning a download or a publisher
+    reload adds nothing.
+
+    A logged event missing from the download raises an error and writes nothing,
+    because a key change would otherwise log existing events as new. After
+    inspecting the rows, make a one-off call with ``allow_missing=True``; don't
+    leave it in a notebook, or the check stays off for every later run.
+
+    Args:
+        events_path: The downloaded flood events CSV.
+        log_path: The event log CSV.
+        allow_missing: Delete missing events from the log instead of raising.
+            An event that later returns will count as new.
+
+    Returns:
+        Number of events added.
+    """
+    events, log = _read_events_and_log(events_path, log_path)
+
+    keys = events.select(EVENT_KEY)
+    added = keys.join(log, on=EVENT_KEY, how="anti").sort(EVENT_KEY)
+    missing = log.join(keys, on=EVENT_KEY, how="anti")
+
+    print(f"Events added to the log:           {added.height:,}")
+    print(f"Logged events missing from data:   {missing.height:,}")
+
+    if not missing.is_empty() and not allow_missing:
+        raise ValueError(
+            f"{missing.height:,} logged events are missing from the download, "
+            f"so the log was not changed:\n{missing}\n"
+            "After inspecting them, make a one-off call with allow_missing=True."
+        )
+
+    if added.is_empty() and missing.is_empty():
+        return 0
+
+    today = datetime.now(timezone.utc).date()
+    pl.concat([
+        log.join(missing, on=EVENT_KEY, how="anti"),
+        added.with_columns(pl.lit(today).alias("first_seen")),
+    ]).write_csv(log_path)
+
+    return added.height
+
+
+def latest_new_events(
+    events_path="data/flood-events.csv",
+    log_path="data/event-log.csv",
+    manifest_path="data/manifest.json",
+    dataset_id="aq7i-eu5q"
+):
+    """Return the flood events in the latest batch of the event log.
+
+    The latest batch is the rows with the newest ``first_seen``. If the latest
+    download added nothing, this is still the last batch that added events, and
+    a message says so.
+
+    Args:
+        events_path: The downloaded flood events CSV.
+        log_path: The event log CSV.
+        manifest_path: The manifest, read for the latest download date.
+        dataset_id: The flood events dataset's entry in the manifest.
+
+    Returns:
+        Polars DataFrame of the batch's rows from ``events_path``.
+    """
+    events, log = _read_events_and_log(events_path, log_path)
+
+    unlogged = events.join(log, on=EVENT_KEY, how="anti")
+    if not unlogged.is_empty():
+        raise ValueError(
+            f"{unlogged.height:,} events are not in the event log, so the latest "
+            "batch can't be trusted. Run update_event_log first."
+        )
+
+    first_seen = log["first_seen"].max()
+    batch = log.filter(pl.col("first_seen") == first_seen)
+    new_events = events.join(batch, on=EVENT_KEY, how="semi")
+
+    if new_events.height != batch.height:
+        raise ValueError(
+            f"The latest batch has {batch.height:,} logged events, but "
+            f"{new_events.height:,} match the flood events data."
+        )
+
+    manifest = json.loads(Path(manifest_path).read_text())["datasets"]
+    downloaded_at = {d["dataset_id"]: d for d in manifest}[dataset_id]["downloaded_at"]
+
+    print(f"Latest batch first seen: {first_seen} (UTC)")
+    if str(first_seen) < downloaded_at:
+        print(
+            f"The latest download ({downloaded_at}) added no new events, so "
+            "this is the last batch that did."
+        )
+
+    return new_events
+
+
+def previous_cutoff(
+    events_path="data/flood-events.csv",
+    log_path="data/event-log.csv"
+):
+    """Return the data cutoff before the latest batch, as a UTC datetime.
+
+    This is the latest ``flood_end_time`` among events first seen before the
+    latest batch.
+    """
+    events, log = _read_events_and_log(events_path, log_path)
+
+    cutoff = (
+        events.join(log, on=EVENT_KEY, how="inner")
+        .filter(pl.col("first_seen") < pl.col("first_seen").max())
+        ["flood_end_time"].max()
+    )
+
+    return cutoff.replace(tzinfo=timezone.utc)
 
 
 # ===========================================================================
