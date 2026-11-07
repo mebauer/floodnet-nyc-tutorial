@@ -1,7 +1,7 @@
 # Re-execute the tutorial notebooks in order, saving outputs in place.
 # Run inside the floodnet_env conda environment.
-#   make notebooks  re-run 01-07 on the data already in data/
-#   make refresh    download new data (notebook 00), then re-run 01-07
+#   make notebooks  re-run 01-08 on the data already in data/
+#   make refresh    download new data (notebook 00), then re-run 01-08
 
 NOTEBOOKS := $(sort $(wildcard [0-9][0-9]-*.ipynb))
 ANALYSIS  := $(filter-out 00-%,$(NOTEBOOKS))

@@ -42,7 +42,9 @@ The ultimate goal of this project is to promote these datasets for anyone intere
 
 - [07-rise-and-peak-depth.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/07-rise-and-peak-depth.ipynb): Asks whether water that rises faster also gets deeper: how often flooding reaches 12 inches, time and rate of rise to a foot of water at tidal vs. non-tidal sensors, rank correlation on skewed data, and two checks on that correlation (measuring the rise away from the peak, and separating storm from site).
 
-**Re-running the notebooks.** With `floodnet_env` active, `make notebooks` re-runs notebooks 01–07 in order on the data already in `data/`. `make refresh` first downloads new data with notebook 00, then re-runs the rest. Both stop at the first notebook that fails.
+- [08-tidal-flooding.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/08-tidal-flooding.ipynb): Looks at tidal sensors on their own, using flood timing alone: how the tidal network grew and how much a few sensors dominate it, one event that spans two high tides, gaps between events that follow the 12.4-hour tide, flooding through the spring-neap cycle, and tidal floods by calendar month.
+
+**Re-running the notebooks.** With `floodnet_env` active, `make notebooks` re-runs notebooks 01–08 in order on the data already in `data/`. `make refresh` first downloads new data with notebook 00, then re-runs the rest. Both stop at the first notebook that fails.
 
 # 3. Data 
 - Street Flooding Events Measured by FloodNet Sensors. Retrieved from https://data.cityofnewyork.us/Environment/FloodNet-Street-Flooding-Events-Measured-by-FloodN/aq7i-eu5q/about_data
