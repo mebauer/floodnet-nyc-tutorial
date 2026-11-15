@@ -10,6 +10,7 @@ dependencies:
   - pyarrow
   - matplotlib
   - seaborn
-  - ffmpeg
+  - mapclassify
+  - requests
   - jupyter
   - fastexcel

@@ -749,9 +749,8 @@ def storm_events(
     on the figure. The window is what defines the storm, not any single date:
     a storm that starts at 11pm spills its flooding into the next calendar day,
     so grouping by the events' own start date would split one storm in two.
-    Hurricane Ida is the clearest case -- every NYC flood event the notebook
-    attributes to Ida starts on 2021-09-01, the day before the storm is named
-    for.
+    Hurricane Ida is the clearest case -- its NYC flooding began the evening
+    of 2021-09-01 and ran past midnight.
 
     Each row therefore carries the window it was selected by, so a count is
     reproducible from the table alone. Counting sensors means counting
