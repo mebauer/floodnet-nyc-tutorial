@@ -837,7 +837,7 @@ def build_rain_episodes(
     end_col: str = "flood_end_time_et",
     max_col: str = "max_depth_inches",
 ):
-    """Group flood events into rain episodes with an interevent dry-period rule.
+    """Group flood events into rain episodes with an interevent-gap rule.
 
     Events are sorted by start time and walked in order. An event starts a new
     episode when it begins more than `gap_hours` after the latest end time of
@@ -854,7 +854,9 @@ def build_rain_episodes(
     Args:
         df: One row per flood event, already filtered to the sensors to group
             (non-tidal, normally). Pandas accepted.
-        gap_hours: Dry period, in hours, that separates two episodes.
+        gap_hours: Hours after the latest end of all earlier events that an
+            event must start to begin a new episode. A gap between floods,
+            not a dry period (METHODS.md caveat 4).
         depth_threshold_inches: Depth a sensor must reach to count as flooded.
         severe_threshold_inches: Depth for severe flooding.
         start_col: Event start; the sort key.
