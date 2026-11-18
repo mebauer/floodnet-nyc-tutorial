@@ -30,11 +30,16 @@ These tutorials aim to teach good practice, not to show off technique.
 
 ## Definitions and parameters
 
+Each basis says where a rule comes from: an official source, which is cited,
+or a choice made for this project, marked **Judgment call**. The notebooks
+say which when they use it.
+
 | Term | Rule | Basis | Where |
 |---|---|---|---|
 | Event | A run of depth readings > 10 mm, verified as a flood by FloodNet QC | FloodNet's definition; one row in the Flood Events dataset | dataset |
 | Flood | Event with peak depth ≥ 4 in at the sensor | NYC Stormwater Flood Maps "nuisance" tier (4 in to < 1 ft); matches `duration_above_4_inches_mins` | notebooks 02, 05–08 |
-| Major flood | Event with peak depth ≥ 12 in at the sensor | Flood Maps "deep and contiguous" tier (≥ 1 ft); matches `duration_above_12_inches_mins` | notebooks 05–07 |
+| Severe flood | Event with peak depth ≥ 12 in at the sensor | Flood Maps "deep and contiguous" tier (≥ 1 ft); "severe" is this project's name for it. Matches `duration_above_12_inches_mins` | notebooks 02, 05–07 |
+| 24 in depth | Time to 24 in and time above 24 in (`duration_above_24_inches_mins`) | FloodNet's dataset column. Not a Flood Maps tier, so it doesn't classify floods | notebook 02 section 2 |
 | Rain episode | **Exploratory grouping, not a definition of an event.** Non-tidal events grouped across the whole network: a new episode starts when an event begins more than 6 h after the latest end time of all earlier events | The 6 h default borrows the minimum interevent time used to separate rainstorms (e.g. Driscoll et al. 1989), adapted to flood timing. Results are worth checking at other gaps. See caveat 4 | `floodnet.build_rain_episodes`; notebook 06 checks episode counts across gaps |
 | Deployment (exposure) | Days from install to removal or to the data cutoff, whichever comes first | Sensor metadata; assumes continuous operation (caveat 6) | `floodnet.days_deployed` |
 | Data cutoff | End of the latest event in the dataset, not the download date | Keeps rates stable across re-runs. See caveat 8 | notebooks 02, 08 |
@@ -42,13 +47,16 @@ These tutorials aim to teach good practice, not to show off technique.
 | Started before the previous cutoff | Latest-batch event whose start is earlier than the latest end time among events first seen before that batch | Same idea as the data cutoff, applied to the previous batch. Marks events that reached us late; publication has no sharp line, so it isn't a QC measure | `floodnet.previous_cutoff`; notebook 04 |
 | Active sensor-month | Sensor installed on or before the month's last day and not removed before its first | Sensor metadata | notebooks 05, 08 |
 | Minimum record | Only sensors deployed ≥ 180 days are ranked by rate | **Judgment call:** keeps one early flood from producing an extreme rate. Not hydrological; doesn't guarantee a full seasonal cycle | notebook 02 |
-| Minimum floods | Only sensors with ≥ 3 qualifying events (floods for the 4 in average, major floods for the 12 in average) are ranked by average time above a depth | **Judgment call:** keeps one or two events from standing in for an average. Not hydrological; the notebook prints how much each top 10 changes at a minimum of 2 or 5 | notebook 02 section 5 |
+| Minimum floods | Only sensors with ≥ 3 qualifying events (floods for the 4 in average, severe floods for the 12 in average) are ranked by average time above a depth. Notebook 07 uses the same minimum of 3 severe floods per sensor for its within-site correlation (`MIN_EVENTS_PER_SENSOR`) | **Judgment call:** keeps one or two events from standing in for an average. Not hydrological; notebook 02 prints how much each top 10 changes at a minimum of 2 or 5, and notebook 07 suggests trying 2 or 4 | notebook 02 section 5; notebook 07 section 4 |
+| Share of sensors flooded | Rain episodes are ranked by the lower bound of the 95% Wilson score interval for the share of active non-tidal sensors that reached 4 in | Wilson (1927) interval, a standard choice for small counts. **Judgment call:** ranking on the lower bound keeps episodes with few active sensors from ranking first on a high share alone. Sensors aren't a random sample of the city (caveat 5), so the interval reflects how few sensors were counted, not uncertainty about the city as a whole | notebook 05 sections 3.4 and 6 |
+| Storm window | `storm_events` / `plot_storm_events` keep events overlapping the storm's ET calendar day, padded by `time_buffer` hours on each side | **Judgment call, no grounded basis yet:** the buffer is set per storm (0 to 12 h) to take in its flooding. Counts depend on it, so storms compared by count should share a buffer | `floodnet.storm_events`; notebook 03 |
+| Outlier (metadata) | A `lowest_point_height_delta_inches` value more than 1.5 × IQR below the first quartile or above the third | Tukey's (1977) box-plot rule, a standard screening convention. Flags values to check, not errors | notebook 01 |
 | Storm plot floor | `storm_events` / `plot_storm_events` keep events with peak ≥ `min_depth_inches`; the default of 0 keeps every event | No filter by default. Pass 4 to show floods only, or another floor with a stated basis | `floodnet.storm_events`; notebook 03 |
 | Separate tidal rise | Within one flood at a tidal sensor, a run of profile readings ≥ 4 in, located by its peak (deepest reading); rises whose peaks are less than 6.2 h apart are joined into one, keeping the deeper peak. A gap in the readings doesn't end a rise | Flood tier for the depth. The 6.2 h spacing is half the M2 tidal period (12.42 h): two high-tide peaks can't be closer than that, so closer peaks are depth flickering around 4 in or one uneven crest. A multi-rise flood is a candidate for merged tides, not a confirmed one: peaks spaced far from 12.4 or 24.8 h point to rain, surge or a bad reading. The count can also miss tides that stay below 4 in at the sensor (caveat 1). The notebook prints counts at 3 h and 9 h too | notebook 08 section 2 |
 | Tidal flood day | A New York calendar date (ET) on which at least one tidal sensor recorded a flood; counted once however many sensors flooded | **Judgment call:** one high tide can flood many sensors, so counting floods would treat one tide as many observations. Consecutive days still aren't independent | notebook 08 section 4 |
 | Moon phase | Days since the most recent new or full moon (0 to ≈ 14.77), from the UTC instant of the day's first flood, using the mean synodic month (29.530589 days) counted from the new moon of 2000-01-06 18:14 UTC | Mean lunar cycle (Meeus, *Astronomical Algorithms*); actual new and full moons differ from the mean by up to about 14 h | notebook 08 section 4 |
 
-Flood and major flood are nested, not exclusive: every major flood is also a
+Flood and severe flood are nested, not exclusive: every severe flood is also a
 flood. For mutually exclusive bins, use < 4 in, 4 to < 12 in, and ≥ 12 in.
 
 ## FloodNet data caveats
@@ -62,7 +70,7 @@ flood. For mutually exclusive bins, use < 4 in, 4 to < 12 in, and ≥ 12 in.
    reading means about 14 in at the low point. Most sensors are also mounted
    over sidewalks, so they don't register water in the roadway until it tops
    the curb. Two consequences:
-   - The flood and major-flood tiers apply to depth at the sensor, which is a
+   - The flood and severe-flood tiers apply to depth at the sensor, which is a
      lower bound on the deepest water nearby. The Flood Maps tiers classify
      modeled flood areas; applying them at one sensor is an adaptation.
    - Comparing raw depths across sensors partly compares mounting height.
@@ -76,9 +84,13 @@ flood. For mutually exclusive bins, use < 4 in, 4 to < 12 in, and ≥ 12 in.
    sensor can be spurious (an object or snow pile left under the sensor can
    hold readings above 10 mm for hours or days) or real (water ponding where
    it can't drain); check the depth profile before reading it either way.
-   Before November 2021 some sensors
-   sampled every 5 minutes instead of every minute, so early onset and drain
-   times are coarser.
+   Readings are usually a minute apart, but gaps of 5 minutes or more occur
+   throughout the record, not only before November 2021, when some sensors
+   sampled every 5 minutes. Where readings are sparse, onset, drain and
+   threshold-crossing times are coarser. A few events also disagree with
+   themselves or with the metadata: the deepest reading in the depth profile
+   can differ from `max_depth_inches`, and an event can start before its
+   sensor's `date_installed`. Check both before relying on a single event.
 
 ### What the observations mean
 3. **Split tidal vs. non-tidal.** `tidally_influenced` (sensor metadata) marks
@@ -95,10 +107,11 @@ flood. For mutually exclusive bins, use < 4 in, 4 to < 12 in, and ≥ 12 in.
      between them. That event counts once, its `duration_mins` includes the
      low-tide troughs, and it outranks single-tide events in any per-event
      duration ranking or average. `duration_above_4_inches_mins` excludes
-     time below 4 in but still adds up every tide. Per-event results at tidal
-     sensors therefore partly measure how many tides merged, though many long
-     tidal events show one sustained peak instead; check the depth profile
-     before reading a long tidal event as one long flood.
+     time below 4 in but still adds up every tide. Where this happens,
+     per-event results partly measure how many tides merged. Many long tidal
+     events show one sustained peak instead, and notebook 08 section 2 counts
+     how many floods hold more than one separate rise. Check that count, and
+     the depth profile, before reading a long tidal event either way.
 4. **Surface observations only.** These data contain no rainfall or drainage
    records. Conclusions stay at the surface hydrology the sensors observe:
    don't attribute floods to sewer capacity or storm intensity.
@@ -207,6 +220,11 @@ zone. Sensor install and removal dates are calendar dates and are not converted.
   *Analysis of Storm Event Characteristics for Selected Rainfall Gauges
   Throughout the United States.* U.S. EPA. (Source of the 6 h minimum
   interevent time convention.)
+- Tukey, J. W. (1977). *Exploratory Data Analysis.* Addison-Wesley. (Source
+  of the 1.5 × IQR outlier rule.)
+- Wilson, E. B. (1927). Probable inference, the law of succession, and
+  statistical inference. *Journal of the American Statistical Association*,
+  22(158), 209–212. <https://doi.org/10.2307/2276774>
 
 **Citing the data.** FloodNet asks that publications list the project as
 "FloodNet (New York University and The City University of New York)" and cite
