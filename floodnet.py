@@ -447,6 +447,12 @@ def previous_cutoff(
         ["flood_end_time"].max()
     )
 
+    if cutoff is None:
+        raise ValueError(
+            "The event log has only one batch, so there is no previous cutoff. "
+            "Run notebook 00 again after FloodNet's next refresh."
+        )
+
     return cutoff.replace(tzinfo=timezone.utc)
 
 
@@ -502,7 +508,9 @@ def time_to_threshold(
 
     For each event whose peak clears `threshold_inches`, finds the first
     upward crossing and linearly interpolates between the bracketing readings
-    so the answer isn't quantized to the sampling interval.
+    so the answer isn't quantized to the sampling interval. Events whose first
+    reading is already at or above the threshold have no rise to time and are
+    skipped, even if they dip and cross it again later.
 
     Args:
         df: One row per flood event. Pandas accepted.
@@ -602,9 +610,11 @@ def time_to_threshold(
     ])
 
     # Upward crossings only: below on the previous reading, at or above now.
+    # An event that starts at or above the threshold has no rise to time.
     crossings = long.filter(
         (pl.col("prev_depth") < threshold_inches) &
-        (pl.col("depth") >= threshold_inches)
+        (pl.col("depth") >= threshold_inches) &
+        (pl.col("start_depth") < threshold_inches)
     )
 
     # Interpolate crossing time.
