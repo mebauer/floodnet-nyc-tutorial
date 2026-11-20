@@ -34,10 +34,20 @@ Each basis says where a rule comes from: an official source, which is cited,
 or a choice made for this project, marked **Judgment call**. The notebooks
 say which when they use it.
 
+**"Flood" here is narrower than FloodNet's.** FloodNet publishes every
+QC-verified event, from just over 10 mm (about 0.4 in) upward, as a "flood
+event". These notebooks reserve *flood* for events that reach 4 in at the
+sensor, for two reasons: it matches the NYC Stormwater Flood Maps "nuisance"
+tier, so results can be compared with the maps, and it keeps the many shallow
+events from dominating counts. This is the project's choice, not FloodNet's.
+Shallower events are still verified flooding, and the 4 in floor is not a
+quality filter: it doesn't remove spurious readings (caveat 2), and a shallow
+reading at the sensor can mean deeper water at the local low point (caveat 1).
+
 | Term | Rule | Basis | Where |
 |---|---|---|---|
-| Event | A run of depth readings > 10 mm, verified as a flood by FloodNet QC | FloodNet's definition; one row in the Flood Events dataset | dataset |
-| Flood | Event with peak depth ≥ 4 in at the sensor | NYC Stormwater Flood Maps "nuisance" tier (4 in to < 1 ft); matches `duration_above_4_inches_mins` | notebooks 02, 05–08 |
+| Event | A run of depth readings > 10 mm, verified as a flood by FloodNet QC; FloodNet calls each one a "flood event" | FloodNet's definition; one row in the Flood Events dataset | dataset |
+| Flood | Event with peak depth ≥ 4 in at the sensor | **Project definition, not FloodNet's.** NYC Stormwater Flood Maps "nuisance" tier (4 in to < 1 ft), for comparison with the maps; also keeps shallow events from dominating counts (caveat 10). Matches `duration_above_4_inches_mins` | notebooks 02, 05–08 |
 | Severe flood | Event with peak depth ≥ 12 in at the sensor | Flood Maps "deep and contiguous" tier (≥ 1 ft); "severe" is this project's name for it. Matches `duration_above_12_inches_mins` | notebooks 02, 05–07 |
 | 24 in depth | Time to 24 in and time above 24 in (`duration_above_24_inches_mins`) | FloodNet's dataset column. Not a Flood Maps tier, so it doesn't classify floods | notebook 02 section 2 |
 | Rain episode | **Exploratory grouping, not a definition of an event.** Non-tidal events grouped across the whole network: a new episode starts when an event begins more than 6 h after the latest end time of all earlier events | The 6 h default borrows the minimum interevent time used to separate rainstorms (e.g. Driscoll et al. 1989), adapted to flood timing. Results are worth checking at other gaps. See caveat 4 | `floodnet.build_rain_episodes`; notebook 06 checks episode counts across gaps |
@@ -168,7 +178,8 @@ flood. For mutually exclusive bins, use < 4 in, 4 to < 12 in, and ≥ 12 in.
    location. Say whether a result is per sensor or per site.
 
 ### Which events count
-10. **Not every event is a flood.** An event starts at > 10 mm, so many events
+10. **FloodNet's events aren't all floods in this project's sense.** Every
+    event is a verified flood to FloodNet, but it starts at > 10 mm, so many events
     are shallow, and the shallow share differs between tidal and non-tidal
     sensors. Raw event counts can skew frequency results. Whether to filter to
     floods (≥ 4 in) depends on the question, so decide deliberately and state
