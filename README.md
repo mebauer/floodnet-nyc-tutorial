@@ -44,6 +44,8 @@ The ultimate goal of this project is to promote these datasets for anyone intere
 
 - [08-tidal-flooding.ipynb](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/08-tidal-flooding.ipynb): Looks at tidal sensors on their own, using flood timing alone: how the tidal network grew and how much a few sensors dominate it, one event that spans two high tides, gaps between events that follow the 12.4-hour tide, flooding through the spring-neap cycle, and tidal floods by calendar month.
 
+**Planned: rainfall and tide notebooks.** These notebooks use only FloodNet's two datasets (plus borough boundaries for maps), so notebooks 05, 06 and 08 infer rain and tide from *when* sensors flooded, a stand-in for measuring them directly. Rain stations and tide gauges measure rain and tide themselves at nearby locations; FloodNet recommends NYS Mesonet / NYC Micronet 5-minute stations for rain and NOAA and USGS tide gauges for tides. They are a better basis for defining storms, matching floods to high tides and checking events against the conditions around them. Notebooks that use them are planned, and storms defined from rainfall would likely supersede the rain-episode grouping in notebooks 05 and 06.
+
 **Re-running the notebooks.** With `floodnet_env` active, `make notebooks` re-runs notebooks 01–08 in order on the data already in `data/`. `make refresh` first downloads new data with notebook 00, then re-runs the rest. Both stop at the first notebook that fails.
 
 # 3. Data 
