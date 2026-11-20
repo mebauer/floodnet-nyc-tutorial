@@ -53,6 +53,8 @@ The ultimate goal of this project is to promote these datasets for anyone intere
 
 **Methods and data caveats.** Definitions, parameters, data caveats and time-zone handling are in [METHODS.md](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/METHODS.md). Read it before building your own analysis on this data.
 
+**AI assistance.** I used Claude (Anthropic's Claude Code) to help write the code, notebooks and documentation in this repo. I reviewed the work and am responsible for it. The assistant's configuration files (`CLAUDE.md`, `.claude/`) are personal setup and aren't included. The one exception is [METHODS.md](https://github.com/mebauer/floodnet-nyc-tutorial/blob/main/METHODS.md): the assistant's instructions load it directly, so the definitions and caveats you read there are the same ones the AI was required to follow. If you analyze this data with an AI assistant, consider giving it METHODS.md too.
+
 # 4. FloodNet Resources
 
 Start here to understand the FloodNet sensor network, datasets, methodology, quality control, and applications of hyperlocal street-flood measurements in New York City.
